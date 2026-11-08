@@ -200,6 +200,7 @@ class RecentsActivity : ComponentActivity() {
         st = OvState(scene = Scene.LOADING, showKillAll = st.showKillAll)
         info = emptyMap()
         selectJob?.cancel()
+        holdJob?.cancel()
         toastJob?.cancel()
         toast = null
         backdropImage = null          // decoded again on the next open: nothing held while hidden
@@ -250,11 +251,14 @@ class RecentsActivity : ComponentActivity() {
     }
 
     // ── keys ───────────────────────────────────────────────────────────────
+    private var holdJob: Job? = null      // OK went down on a card: opens the menu at HOLD_MS
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val btn = Keys.btn(event.keyCode)
         if (btn == Btn.OTHER) return super.dispatchKeyEvent(event)     // volume etc. still work
         val down = event.action == KeyEvent.ACTION_DOWN
         if (!down && event.action != KeyEvent.ACTION_UP) return true
+        if (!down && btn == Btn.OK) holdJob?.cancel()
         val (n, effects) = Overlay.key(st, KeyIn(btn, down, event.repeatCount))
         st = n
         effects.forEach(::run)
@@ -287,6 +291,10 @@ class RecentsActivity : ComponentActivity() {
                 )
             }
             Effect.OpenSettings -> startActivity(Intent(this, SettingsActivity::class.java))
+            Effect.ArmHold -> {
+                holdJob?.cancel()
+                holdJob = lifecycleScope.launch { delay(Overlay.HOLD_MS); st = Overlay.holdElapsed(st) }
+            }
             Effect.Close -> close()
             Effect.GateAction -> {
                 val s = ShizukuManager.state()

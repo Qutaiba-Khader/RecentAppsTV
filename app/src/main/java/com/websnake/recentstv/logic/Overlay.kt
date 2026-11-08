@@ -9,7 +9,7 @@ enum class Scene { LOADING, OVERLAY, EMPTY, SHIZUKU }
 
 enum class Btn { LEFT, RIGHT, UP, DOWN, OK, BACK, MENU, OTHER }
 
-/** One remote key event. [repeat] > 0 while a key is held. */
+/** One remote key event. [repeat] > 0 while a key is held: a real remote repeats every ~50 ms. */
 data class KeyIn(val btn: Btn, val down: Boolean, val repeat: Int = 0)
 
 const val PEEK_NONE = 0
@@ -21,6 +21,8 @@ sealed interface Item {
     val key: String
     val taskId: Int?
     data object KillAll : Item { override val key = "#killall"; override val taskId: Int? = null }
+    /** The ⚙ tile at the right end of the row: opens Settings. */
+    data object Settings : Item { override val key = "#settings"; override val taskId: Int? = null }
     data class Task(val ref: TaskRef) : Item { override val key get() = ref.pkg; override val taskId: Int? get() = ref.taskId }
     /** A pinned app; [taskId] is its running task, null when it isn't running. */
     data class Pin(val pkg: String, override val taskId: Int?) : Item {
@@ -48,7 +50,7 @@ data class OvState(
     val killing: Boolean = false,             // kill-all animation running
     val ctxPkg: String? = null,               // long-press menu target
     val ctxSel: Int = 0,
-    val longPress: Boolean = false,           // OK is held and already opened the menu
+    val longPress: Boolean = false,           // this OK press already did its job (opened the menu / ran a menu row)
     val pressing: Boolean = false,            // OK is down on a card (press-in feedback)
     val busy: Boolean = false,                // switching / clearing: ignore input
     val selecting: String? = null,            // package chosen with OK: the select zoom is playing
@@ -62,9 +64,10 @@ data class OvState(
 
     val hasKillAll get() = showKillAll && tasks.isNotEmpty()
 
-    /** Logical order, right → left: [Kill All] [pins if right] [tasks…] [pins if left]. */
+    /** Logical order, right → left: [⚙] [Kill All] [pins if right] [tasks…] [pins if left]. */
     val items: List<Item> by lazy {
         buildList {
+            add(Item.Settings)
             if (hasKillAll) add(Item.KillAll)
             if (pinRight) addAll(pins)
             tasks.forEach { add(Item.Task(it)) }
@@ -91,11 +94,16 @@ sealed interface Effect {
     data class SetPin(val pkg: String, val pinned: Boolean) : Effect
     data class AppInfo(val pkg: String) : Effect
     data object OpenSettings : Effect
+    /** OK went down on a card: call [Overlay.holdElapsed] after [Overlay.HOLD_MS] unless it is released first. */
+    data object ArmHold : Effect
     data object Close : Effect
     data object GateAction : Effect          // open Shizuku or ask for permission, then reload
 }
 
 object Overlay {
+
+    /** Holding OK this long on a card opens its menu (design: ≥ 550 ms). Timed, not counted in key repeats. */
+    const val HOLD_MS = 550L
 
     /** Task #1 first; with no tasks, the first pin. */
     fun defaultFocus(s: OvState): Int {
@@ -134,6 +142,9 @@ object Overlay {
             // The OK release that follows the long-press lands here, with the menu open:
             // it ends the hold, or the next real OK tap would be eaten.
             if (!k.down) return (if (k.btn == Btn.OK && s.longPress) s.copy(longPress = false) else s) to emptyList()
+            // OK still held from the press that opened the menu: its repeats must not run a row
+            // (a real remote sends one every ~50 ms — they used to pin the app at once).
+            if (k.btn == Btn.OK && (k.repeat > 0 || s.longPress)) return s to emptyList()
             return ctxKey(s, k.btn)
         }
 
@@ -144,10 +155,9 @@ object Overlay {
             val item = s.focusedItem
             val card = item is Item.Task || item is Item.Pin
             if (k.down) {
-                if (k.repeat == 1 && card) {
-                    return s.copy(longPress = true, pressing = false, ctxSel = 0, ctxPkg = item!!.key, peek = PEEK_NONE) to emptyList()
-                }
-                return (if (k.repeat == 0) s.copy(pressing = card) else s) to emptyList()
+                // repeats of a held OK do nothing: the hold is timed (ArmHold → holdElapsed)
+                if (k.repeat > 0) return s to emptyList()
+                return s.copy(pressing = card) to (if (card) listOf(Effect.ArmHold) else emptyList())
             }
             val up = s.copy(pressing = false)
             return if (s.longPress) up.copy(longPress = false) to emptyList() else activate(up)
@@ -161,7 +171,17 @@ object Overlay {
         }
     }
 
-    private fun overlayKey(s: OvState, b: Btn): Pair<OvState, List<Effect>> {
+    /** The hold timer fired: OK is still down on the same card → open its menu above it. */
+    fun holdElapsed(s: OvState): OvState {
+        if (!s.pressing || s.ctxPkg != null || s.closing || s.selecting != null) return s
+        val item = s.focusedItem
+        if (item !is Item.Task && item !is Item.Pin) return s
+        return s.copy(longPress = true, pressing = false, ctxSel = 0, ctxPkg = item.key, peek = PEEK_NONE)
+    }
+
+    private fun overlayKey(s0: OvState, b: Btn): Pair<OvState, List<Effect>> {
+        // another key while OK is held: the hold no longer counts (it would open the menu on the next card)
+        val s = s0.copy(pressing = false)
         // busy/killing: switching or clearing. flying: the dismissed card is still on its way
         // out — a key now would act on the app being removed (found by flowmap P-OVL-36).
         if (s.busy || s.killing || s.flying != null) return s to emptyList()
@@ -186,6 +206,7 @@ object Overlay {
 
     private fun activate(s: OvState): Pair<OvState, List<Effect>> {
         val item = s.focusedItem ?: return s to emptyList()
+        if (item == Item.Settings) return s to listOf(Effect.OpenSettings)
         if (item == Item.KillAll) return s.copy(busy = true, killing = true, peek = PEEK_NONE) to
             listOf(Effect.KillAll(s.tasks + s.pins.mapNotNull { p -> p.taskId?.let { TaskRef(it, p.pkg) } }))
         // a task, or a pin (its running task, or a launch when it isn't running)

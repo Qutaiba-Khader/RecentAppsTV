@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4 — 2026-11-08
+- Fixed (found on the TV): holding OK pinned the app at once and never showed the balloon menu. A real remote repeats
+  a held OK every ~50 ms and a repeat ran the menu's first row. Now the hold is a 550 ms timer (design), repeats of OK
+  are ignored, and the OK that opened the menu runs no row until it is released.
+- New ⚙ Settings tile at the right end of the row — the Google TV remote has no Menu key, so 1.2/1.3 left Settings
+  reachable only through the (broken) hold menu.
+- Device tests now use a virtual remote (`tools/perf/rkey`, uinput) that holds keys like a real one; 1.3's
+  `input keyevent --longpress` sent a single repeat and hid the bug.
+- Tests: 137, 100 % lines and branches, 34 of 34 gate mutants caught.
+
 ## 1.3 — 2026-11-08
 - Background image picker for TV (as Projectivy Launcher): the picker apps (Gallery, file managers, Files…) listed
   and asked directly — the Android TV "documents" stub is skipped — plus an in-app D-pad grid of the device's pictures

@@ -42,9 +42,9 @@ The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root
 
 | Key | In the list |
 |---|---|
-| **← / →** | move between apps (→ goes toward newer apps and **Kill all**) |
-| **OK** | open that app · on **Kill all**: clear running apps (pins stay) |
-| **Hold OK** | menu: *Pin to row / Unpin* · *Add to exceptions* · *App info* · *Settings* |
+| **← / →** | move between apps (→ goes toward newer apps, **Kill all**, then the **⚙ Settings** tile at the right end) |
+| **OK** | open that app · on **Kill all**: clear running apps (pins stay) · on **⚙**: open Settings |
+| **Hold OK** (about half a second) | a balloon menu above the app: *Pin to row / Unpin* · *Add to exceptions* · *App info* · *Settings* — it stays open after you let go; **↑ / ↓** pick, **OK** runs, **Back** closes |
 | **↑ ↑** or **↓ ↓** | remove that app (first press lifts the card with a hint, second press sends it off) — pinned apps can't be removed this way |
 | **Back** | close the menu, or close the list (the app underneath carries on) |
 | **Menu** | settings |
@@ -53,6 +53,14 @@ In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The scree
 position* and the colour swatches read left-to-right (→ means Right). On *Pinned apps* and *Exceptions*, **↑** from the
 first row reaches the *Unpin all* / *Hide all* / *Show all* buttons. On *Background image*, **↑** from the pictures
 reaches the picker apps (Gallery, Files…).
+
+## What's new in 1.4
+
+- **Hold OK works on a real remote.** In 1.3, holding OK on the TV pinned the app at once and no menu was seen: the
+  remote repeats a held OK about every 50 ms, and a repeat ran the menu's first row (*Pin*) the moment it opened. The
+  hold is now timed (550 ms, as in the design), key repeats are ignored, and the balloon stays open until you choose.
+- **⚙ Settings tile** at the right end of the row (after *Kill all*), so Settings is always one press away — the
+  Google TV remote has no Menu key. The hold menu's *Settings* row still works too.
 
 ## What's new in 1.3
 
@@ -129,7 +137,7 @@ com.websnake.recentstv/.RecentsActivity        (or the action com.websnake.recen
 ```
 
 It also appears as a normal app in the launcher, and publishes a launcher shortcut. There is deliberately no
-"how to open" option inside the app. Settings: the ⚙ button, the **Menu** key, or `com.websnake.recentstv/.SettingsActivity`.
+"how to open" option inside the app. Settings: the ⚙ tile at the right end of the row, hold OK → *Settings*, the **Menu** key, or `com.websnake.recentstv/.SettingsActivity`.
 
 Upgrading from 1.0 keeps your settings. Reinstalling may ask for the Shizuku permission again.
 

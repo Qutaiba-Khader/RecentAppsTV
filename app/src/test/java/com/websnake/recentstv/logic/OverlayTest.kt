@@ -22,24 +22,25 @@ class OverlayTest {
         val (s1, e1) = press(s, b); val (s2, e2) = release(s1, b); return s2 to (e1 + e2)
     }
     private fun keys(s: OvState) = s.items.map { it.key }
-    private fun menu(s: OvState) = press(s, Btn.OK, 1).first   // hold OK
+    private fun menu(s: OvState) = Overlay.holdElapsed(press(s, Btn.OK).first)   // hold OK for HOLD_MS
 
     // ── load and layout ──
     @Test fun `P-OVL-01 load with tasks and Kill All focuses the newest task`() {
         val s = ready(a, b)
-        assertEquals(Scene.OVERLAY, s.scene); assertEquals(1, s.focus); assertEquals(Item.Task(a), s.focusedItem)
-        assertEquals(listOf("#killall", "app.a", "app.b"), keys(s)); assertTrue(s.hasKillAll); assertFalse(s.emptySlot)
-        assertNull(Item.KillAll.taskId)
+        assertEquals(Scene.OVERLAY, s.scene); assertEquals(2, s.focus); assertEquals(Item.Task(a), s.focusedItem)
+        assertEquals(listOf("#settings", "#killall", "app.a", "app.b"), keys(s)); assertTrue(s.hasKillAll); assertFalse(s.emptySlot)
+        assertNull(Item.KillAll.taskId); assertNull(Item.Settings.taskId)
     }
 
-    @Test fun `P-OVL-02 load without Kill All focuses index 0 = newest`() {
+    @Test fun `P-OVL-02 load without Kill All focuses the newest, right after the gear`() {
         val s = ready(a, b, killAll = false)
-        assertEquals(0, s.focus); assertEquals(listOf("app.a", "app.b"), keys(s)); assertFalse(s.hasKillAll)
+        assertEquals(1, s.focus); assertEquals(listOf("#settings", "app.a", "app.b"), keys(s)); assertFalse(s.hasKillAll)
     }
 
     @Test fun `P-OVL-03 load with no tasks and no pins shows Empty`() {
         val s = ready()
-        assertEquals(Scene.EMPTY, s.scene); assertFalse(s.hasKillAll); assertEquals(0, s.itemCount); assertFalse(s.emptySlot)
+        assertEquals(Scene.EMPTY, s.scene); assertFalse(s.hasKillAll); assertEquals(1, s.itemCount); assertFalse(s.emptySlot)
+        assertNull(s.focusedItem)
     }
 
     @Test fun `P-OVL-04 a reload clears every transient guard`() {
@@ -56,8 +57,8 @@ class OverlayTest {
     }
 
     @Test fun `P-OVL-06 pins sit at the far end by default, next to Kill All when right`() {
-        assertEquals(listOf("#killall", "app.a", "p.x", "p.y"), keys(ready(a, pins = listOf("p.x", "p.y"))))
-        assertEquals(listOf("#killall", "p.x", "p.y", "app.a"), keys(ready(a, pins = listOf("p.x", "p.y"), pinRight = true)))
+        assertEquals(listOf("#settings", "#killall", "app.a", "p.x", "p.y"), keys(ready(a, pins = listOf("p.x", "p.y"))))
+        assertEquals(listOf("#settings", "#killall", "p.x", "p.y", "app.a"), keys(ready(a, pins = listOf("p.x", "p.y"), pinRight = true)))
     }
 
     @Test fun `P-OVL-07 a pinned app that runs shows once, in the pins, with its task`() {
@@ -70,7 +71,7 @@ class OverlayTest {
     @Test fun `P-OVL-08 only pins - no Kill All, the placeholder shows, focus on the first pin`() {
         val s = ready(pins = listOf("p.x", "p.y"))
         assertEquals(Scene.OVERLAY, s.scene); assertFalse(s.hasKillAll); assertTrue(s.emptySlot)
-        assertEquals(0, s.focus); assertEquals("p.x", s.focusedItem?.key)
+        assertEquals(1, s.focus); assertEquals("p.x", s.focusedItem?.key)
     }
 
     @Test fun `P-OVL-09 default focus with nothing at all is 0`() {
@@ -78,10 +79,11 @@ class OverlayTest {
     }
 
     // ── navigation ──
-    @Test fun `P-OVL-10 RIGHT moves toward Kill All and stops there (RTL)`() {
-        var s = ready(a, b).copy(focus = 2)
-        s = press(s, Btn.RIGHT).first; assertEquals(1, s.focus)
-        s = press(s, Btn.RIGHT).first; assertEquals(0, s.focus)
+    @Test fun `P-OVL-10 RIGHT moves toward Kill All, then the gear, and stops there (RTL)`() {
+        var s = ready(a, b).copy(focus = 3)
+        s = press(s, Btn.RIGHT).first; assertEquals(2, s.focus)
+        s = press(s, Btn.RIGHT).first; assertEquals(Item.KillAll, s.focusedItem)
+        s = press(s, Btn.RIGHT).first; assertEquals(Item.Settings, s.focusedItem)
         s = press(s, Btn.RIGHT).first; assertEquals(0, s.focus)
     }
 
@@ -119,7 +121,7 @@ class OverlayTest {
     @Test fun `P-OVL-16 fly-off landing removes the task, keeps focus in place, then dismisses it`() {
         val s = press(press(ready(a, b, c), Btn.DOWN).first, Btn.DOWN).first
         val (n, e) = Overlay.flyComplete(s, "app.a")
-        assertEquals(listOf(b, c), n.all); assertNull(n.flying); assertEquals(1, n.focus); assertEquals("app.b", n.focusedItem?.key)
+        assertEquals(listOf(b, c), n.all); assertNull(n.flying); assertEquals(2, n.focus); assertEquals("app.b", n.focusedItem?.key)
         assertEquals(listOf(Effect.Dismiss(a)), e)
     }
 
@@ -139,10 +141,12 @@ class OverlayTest {
         assertNull(n.flying); assertTrue(e.isEmpty()); assertEquals(2, n.all.size)
     }
 
-    @Test fun `P-OVL-19 UP DOWN on Kill All or a pin do nothing`() {
-        val k = ready(a).copy(focus = 0)
+    @Test fun `P-OVL-19 UP DOWN on Kill All, the gear or a pin do nothing`() {
+        val k = ready(a).copy(focus = 1)
         assertEquals(k, press(k, Btn.DOWN).first)
-        val p = ready(a, pins = listOf("p.x")).copy(focus = 2)
+        val g = ready(a).copy(focus = 0)
+        assertEquals(g, press(g, Btn.UP).first)
+        val p = ready(a, pins = listOf("p.x")).copy(focus = 3)
         assertEquals(p, press(p, Btn.UP).first)
     }
 
@@ -161,10 +165,10 @@ class OverlayTest {
     }
 
     @Test fun `P-OVL-22 a pinned app that isn't running is launched (no task id)`() {
-        val s = ready(a, pins = listOf("p.x")).copy(focus = 2)
-        assertEquals(listOf(Effect.Switch("p.x", null)), tap(s, Btn.OK).second)
+        val s = ready(a, pins = listOf("p.x")).copy(focus = 3)
+        assertEquals(listOf(Effect.ArmHold, Effect.Switch("p.x", null)), tap(s, Btn.OK).second)
         val r = ready(a, pins = listOf("app.a"))
-        assertEquals(listOf(Effect.Switch("app.a", 11)), tap(r, Btn.OK).second)
+        assertEquals(listOf(Effect.ArmHold, Effect.Switch("app.a", 11)), tap(r, Btn.OK).second)
     }
 
     @Test fun `P-OVL-23 while selecting every key is ignored`() {
@@ -173,18 +177,18 @@ class OverlayTest {
     }
 
     @Test fun `P-OVL-24 OK on Kill All clears tasks and running pins, pins stay`() {
-        val s = ready(a, b, pins = listOf("app.b", "p.x")).copy(focus = 0)
+        val s = ready(a, b, pins = listOf("app.b", "p.x")).copy(focus = 1)
         assertFalse(press(s, Btn.OK).first.pressing)            // no press-in on Kill All
         val (k, e) = tap(s, Btn.OK)
         assertTrue(k.killing && k.busy)
         assertEquals(listOf(Effect.KillAll(listOf(a, b))), e)
         val done = Overlay.killAllDone(k)
         assertEquals(Scene.OVERLAY, done.scene); assertTrue(done.all.isEmpty()); assertFalse(done.busy || done.killing)
-        assertEquals(listOf(Item.Pin("app.b", null), Item.Pin("p.x", null)), done.pins); assertEquals(0, done.focus)
+        assertEquals(listOf(Item.Pin("app.b", null), Item.Pin("p.x", null)), done.pins); assertEquals(1, done.focus)
     }
 
     @Test fun `P-OVL-25 Kill All with no pins ends in Empty`() {
-        val k = tap(ready(a, b).copy(focus = 0), Btn.OK).first
+        val k = tap(ready(a, b).copy(focus = 1), Btn.OK).first
         assertEquals(Scene.EMPTY, Overlay.killAllDone(k).scene)
     }
 
@@ -209,19 +213,21 @@ class OverlayTest {
         assertEquals("app.a", m.ctxPkg); assertTrue(m.longPress); assertFalse(m.pressing); assertEquals(0, m.ctxSel)
         val (r, e) = release(m, Btn.OK)
         assertFalse(r.longPress); assertTrue(e.isEmpty()); assertEquals("app.a", r.ctxPkg)
-        assertEquals("p.x", menu(ready(a, pins = listOf("p.x")).copy(focus = 2)).ctxPkg)
+        assertEquals("p.x", menu(ready(a, pins = listOf("p.x")).copy(focus = 3)).ctxPkg)
     }
 
-    @Test fun `P-OVL-29 a hold on Kill All, a past-the-end focus or a longer repeat opens nothing`() {
+    @Test fun `P-OVL-29 a hold on Kill All, the gear, a past-the-end focus, or key repeats alone open nothing`() {
+        assertNull(menu(ready(a).copy(focus = 1)).ctxPkg)
         assertNull(menu(ready(a).copy(focus = 0)).ctxPkg)
         assertNull(menu(ready(a).copy(focus = 9)).ctxPkg)
+        assertNull(press(ready(a), Btn.OK, 1).first.ctxPkg)
         assertNull(press(ready(a), Btn.OK, 2).first.ctxPkg)
     }
 
     @Test fun `P-OVL-30 after the menu closes the next OK tap opens the app (no stale hold)`() {
         val closed = press(release(menu(ready(a, b)), Btn.OK).first, Btn.BACK).first
         assertNull(closed.ctxPkg)
-        assertEquals(listOf(Effect.Switch("app.a", 11)), tap(closed, Btn.OK).second)
+        assertEquals(listOf(Effect.ArmHold, Effect.Switch("app.a", 11)), tap(closed, Btn.OK).second)
     }
 
     @Test fun `P-OVL-31 menu - UP DOWN clamp, LEFT RIGHT do nothing`() {
@@ -248,9 +254,9 @@ class OverlayTest {
     }
 
     @Test fun `P-OVL-34 menu - Unpin a pin that isn't running removes it, or empties the row`() {
-        val s = ready(a, pins = listOf("p.x")).copy(focus = 2)
+        val s = ready(a, pins = listOf("p.x")).copy(focus = 3)
         val n = press(release(menu(s), Btn.OK).first, Btn.OK).first
-        assertEquals(listOf("#killall", "app.a"), keys(n)); assertEquals(1, n.focus)
+        assertEquals(listOf("#settings", "#killall", "app.a"), keys(n)); assertEquals(2, n.focus)
         val only = press(release(menu(ready(pins = listOf("p.x"))), Btn.OK).first, Btn.OK).first
         assertEquals(Scene.EMPTY, only.scene)
     }
@@ -262,7 +268,7 @@ class OverlayTest {
         assertEquals(listOf(Effect.AddException("app.a")), e)
         val (n, e2) = Overlay.flyComplete(f, "app.a")
         assertEquals(listOf(b), n.all); assertTrue(e2.isEmpty())
-        val p = ready(a, pins = listOf("p.x")).copy(focus = 2)
+        val p = ready(a, pins = listOf("p.x")).copy(focus = 3)
         val fp = press(press(release(menu(p), Btn.OK).first, Btn.DOWN).first, Btn.OK).first
         assertTrue(Overlay.flyComplete(fp, "p.x").first.pinned.isEmpty())
     }
@@ -336,7 +342,8 @@ class OverlayTest {
     @Test fun `P-OVL-45 item keys and lookups`() {
         assertEquals("#killall", Item.KillAll.key)
         val s = ready(a, pins = listOf("p.x"))
-        assertEquals(2, s.indexOf("p.x")); assertEquals(-1, s.indexOf("nope")); assertNull(s.itemAt(7))
+        assertEquals(3, s.indexOf("p.x")); assertEquals(-1, s.indexOf("nope")); assertNull(s.itemAt(7))
+        assertEquals("#settings", Item.Settings.key)
         assertNull(s.ctxItem)
     }
 
@@ -354,5 +361,35 @@ class OverlayTest {
         val held = ready(a).copy(busy = true, longPress = true)
         assertTrue(press(held, Btn.OK).first.longPress)
         assertFalse(release(held, Btn.OK).first.longPress)
+    }
+
+    // the TV bug (1.3): a held OK repeats every ~50 ms; the 2nd repeat used to run "Pin" and close the menu
+    @Test fun `P-OVL-48 a real remote hold - repeats keep the balloon open with nothing run, release keeps it`() {
+        var s = press(ready(a, b), Btn.OK).first
+        for (r in 1..8) s = press(s, Btn.OK, r).first          // ~400 ms of repeats before the timer
+        assertNull(s.ctxPkg); assertTrue(s.pressing)
+        s = Overlay.holdElapsed(s)                              // 550 ms
+        for (r in 9..30) { val (n, e) = press(s, Btn.OK, r); assertTrue(e.isEmpty()); s = n }
+        assertEquals("app.a", s.ctxPkg); assertEquals(0, s.ctxSel); assertTrue(s.pinned.isEmpty())
+        val (up, e) = release(s, Btn.OK)
+        assertEquals("app.a", up.ctxPkg); assertFalse(up.longPress); assertTrue(e.isEmpty())
+    }
+
+    @Test fun `P-OVL-49 the hold timer after a release, a move or on a non-card opens nothing`() {
+        val p = press(ready(a, b), Btn.OK).first
+        assertNull(Overlay.holdElapsed(release(p, Btn.OK).first.copy(busy = false, selecting = null)).ctxPkg)
+        val moved = press(p, Btn.LEFT).first
+        assertFalse(moved.pressing); assertNull(Overlay.holdElapsed(moved).ctxPkg)
+        assertNull(Overlay.holdElapsed(ready(a).copy(focus = 1, pressing = true)).ctxPkg)
+        assertNull(Overlay.holdElapsed(ready().copy(pressing = true)).ctxPkg)
+    }
+
+    @Test fun `P-OVL-50 the gear tile opens Settings on release, no press-in, no hold`() {
+        val g = ready(a, b).copy(focus = 0)
+        val (d, e1) = press(g, Btn.OK)
+        assertFalse(d.pressing); assertTrue(e1.isEmpty())
+        val (n, e2) = release(d, Btn.OK)
+        assertEquals(listOf(Effect.OpenSettings), e2); assertFalse(n.busy); assertNull(n.selecting)
+        assertEquals(Item.Settings, ready(pins = listOf("p.x")).items.first())
     }
 }

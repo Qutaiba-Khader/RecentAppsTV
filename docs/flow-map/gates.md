@@ -14,8 +14,8 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 | G-OK-busy | OK | a hold while switching opens no menu | a hold while switching opens no menu | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-OK-killing | OK | a hold during Kill All opens no menu | a hold during Kill All opens no menu | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-OK-flying | OK | a hold during a fly-off opens no menu | a hold during a fly-off opens no menu | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
-| G-HOLD-repeat | HOLD | the first press of OK opens nothing | the first press of OK opens nothing | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
-| G-HOLD-card | HOLD | a hold on Kill All opens nothing, on a pin it does | a hold on Kill All opens nothing, on a pin it does | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-repeat | HOLD | key repeats of a held OK never open the menu - only the timer does | key repeats of a held OK never open the menu - only the timer does | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-card | HOLD | a hold on Kill All or the gear opens nothing, on a task it does | a hold on Kill All or the gear opens nothing, on a task it does | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-INPUT-busy | INPUT | no focus move while switching | no focus move while switching | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-INPUT-killing | INPUT | no peek during Kill All | no peek during Kill All | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-INPUT-flying | INPUT | no peek during a fly-off | no peek during a fly-off | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
@@ -34,6 +34,15 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 | G-CLAMP-fits | CLAMP | a strip that fits is centred whole, whatever the focus | a strip that fits is centred whole, whatever the focus | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-CLAMP-ends | CLAMP | the long strip is pinned at both ends | the long strip is pinned at both ends | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-HOLD-release | HOLD | the release after a hold opens nothing | the release after a hold opens nothing | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-held | HOLD | a key repeat of OK in the menu runs no row, a new press does | a key repeat of OK in the menu runs no row, a new press does | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-same | HOLD | the OK that opened the menu runs no row until it is released | the OK that opened the menu runs no row until it is released | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-pressing | HOLD | the timer opens the menu only while OK is still down | the timer opens the menu only while OK is still down | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-open | HOLD | a timer while a menu is already open changes nothing | a timer while a menu is already open changes nothing | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-gone | HOLD | a timer after the overlay started closing opens nothing | a timer after the overlay started closing opens nothing | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-chosen | HOLD | a timer after an app was chosen opens nothing | a timer after an app was chosen opens nothing | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-HOLD-pin | HOLD | a hold on a pin opens its menu | a hold on a pin opens its menu | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-gear | ROW | the gear tile is always first in the row | the gear tile is always first in the row | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-OK-gear | OK | OK on the gear opens Settings, on a task it opens the app | OK on the gear opens Settings, on a task it opens the app | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 
 ## Mode combinations
 

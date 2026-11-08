@@ -81,6 +81,7 @@ private val FLY = 350.dp
 private val LABEL_GAP = 15.dp         // design: 30px → 40px below the card as it fades in
 private val MENU_SHIFT = 97.dp        // row slides down while the long-press menu is open
 private val EMPTY_SLOT_W = 320.dp
+private const val SETTINGS_TILE = 0.86f   // ⚙ tile width, × card size
 private val MENU_EST_H = 240.dp        // long-press menu height (header + 4 rows)
 private const val DIMMED = 0.32f
 
@@ -128,12 +129,14 @@ fun RecentsOverlay(
     // ── slots, visual order left → right (logical order is right → left) ──
     val slots: List<Slot> = remember(state.items, state.emptySlot, state.pinRight, cardDp, pinDp) {
         val logical = state.items.mapIndexed { i, it ->
-            val w = when (it) { Item.KillAll -> cardDp * 1.34f; is Item.Pin -> pinDp; is Item.Task -> cardDp }
+            val w = when (it) {
+                Item.Settings -> cardDp * SETTINGS_TILE; Item.KillAll -> cardDp * 1.34f; is Item.Pin -> pinDp; is Item.Task -> cardDp
+            }
             Slot(it.key, it, i, w, it is Item.Pin)
         }.toMutableList()
         if (state.emptySlot) {
             val e = Slot("#empty", null, -1, EMPTY_SLOT_W, false)
-            if (state.pinRight) logical.add(e) else logical.add(0, e)
+            if (state.pinRight) logical.add(e) else logical.add(1, e)     // after the ⚙ tile
         }
         logical.asReversed().toList()
     }
@@ -208,6 +211,7 @@ fun RecentsOverlay(
             ) {
                 when (item) {
                     null -> EmptySlotBox(cardDp)
+                    Item.Settings -> SettingsTile(focused, cardDp, cardShape)
                     Item.KillAll -> KillAllTile(focused, cardDp, cardShape, state.killing)
                     is Item.Task, is Item.Pin -> {
                         val task = info[slot.key]
@@ -619,6 +623,50 @@ private fun KillAllTile(focused: Boolean, cardDp: Dp, cardShape: Shape, killing:
                 modifier = Modifier.size(cardDp * 0.42f),
             )
             Text("Kill all", style = Type.killLabel, color = glyph, maxLines = 1)
+        }
+    }
+}
+
+/** The ⚙ tile at the right end of the row: the way into Settings. Neutral until focused. */
+@Composable
+private fun SettingsTile(focused: Boolean, cardDp: Dp, cardShape: Shape) {
+    val accent = LocalAccent.current
+    val std = tween<Float>(Motion.FOCUS_MS, easing = Motion.standard)
+    val scale = animateFloatAsState(if (focused) Motion.KILL_FOCUS_SCALE else 1f, std, label = "gscale")
+    val f = animateFloatAsState(if (focused) 1f else 0f, std, label = "gfocus")
+    val glyph by animateColorAsState(if (focused) accent.onDark else Tokens.textDim, tween(Motion.FOCUS_MS), label = "gglyph")
+    val w = cardDp * SETTINGS_TILE
+
+    Box(Modifier.size(w), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .requiredSize(w * 1.5f)
+                .drawBehind {
+                    if (f.value > 0.01f) drawCircle(
+                        Brush.radialGradient(listOf(accent.glow.copy(alpha = accent.glow.alpha * f.value), Color.Transparent)),
+                        radius = size.minDimension / 2f * scale.value,
+                    )
+                },
+        )
+        Column(
+            Modifier
+                .size(w)
+                .graphicsLayer { scaleX = scale.value; scaleY = scale.value; this.shape = cardShape; clip = true }
+                .drawBehind {
+                    val outline = cardShape.createOutline(size, layoutDirection, this)
+                    drawOutline(outline, lerp(Tokens.surface2, accent.base, f.value))
+                    drawOutline(outline, lerp(Tokens.line, accent.base, f.value), style = Stroke(2.dp.toPx()))
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_settings),
+                contentDescription = "Settings",
+                colorFilter = ColorFilter.tint(glyph),
+                modifier = Modifier.size(w * 0.38f),
+            )
+            Text("Settings", style = Type.small.copy(fontWeight = FontWeight.Bold), color = glyph, maxLines = 1, softWrap = false)
         }
     }
 }

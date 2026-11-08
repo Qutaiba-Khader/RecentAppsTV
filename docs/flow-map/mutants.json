@@ -30,18 +30,6 @@
   "replace": "if (s.busy || s.killing) return s.copy(pressing = false, longPress = s.longPress && k.down) to emptyList()"
  },
  {
-  "id": "G-HOLD-repeat",
-  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "if (k.repeat == 1 && card) {",
-  "replace": "if (card) {"
- },
- {
-  "id": "G-HOLD-card",
-  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "if (k.repeat == 1 && card) {",
-  "replace": "if (k.repeat == 1) {"
- },
- {
   "id": "G-HOLD-release",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
   "find": "val closed = s.copy(ctxPkg = null, longPress = true)",
@@ -148,5 +136,71 @@
   "file": "app/src/main/java/com/websnake/recentstv/logic/Geometry.kt",
   "find": ".coerceIn(viewport - strip.total, 0f)",
   "replace": ""
+ },
+ {
+  "id": "G-HOLD-repeat",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (k.repeat > 0) return s to emptyList()",
+  "replace": "if (false) return s to emptyList()"
+ },
+ {
+  "id": "G-HOLD-held",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (k.btn == Btn.OK && (k.repeat > 0 || s.longPress)) return s to emptyList()",
+  "replace": "if (k.btn == Btn.OK && (s.longPress)) return s to emptyList()"
+ },
+ {
+  "id": "G-HOLD-same",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (k.btn == Btn.OK && (k.repeat > 0 || s.longPress)) return s to emptyList()",
+  "replace": "if (k.btn == Btn.OK && (k.repeat > 0)) return s to emptyList()"
+ },
+ {
+  "id": "G-HOLD-pressing",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (!s.pressing || s.ctxPkg != null || s.closing || s.selecting != null) return s",
+  "replace": "if (s.ctxPkg != null || s.closing || s.selecting != null) return s"
+ },
+ {
+  "id": "G-HOLD-open",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (!s.pressing || s.ctxPkg != null || s.closing || s.selecting != null) return s",
+  "replace": "if (!s.pressing || s.closing || s.selecting != null) return s"
+ },
+ {
+  "id": "G-HOLD-gone",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (!s.pressing || s.ctxPkg != null || s.closing || s.selecting != null) return s",
+  "replace": "if (!s.pressing || s.ctxPkg != null || s.selecting != null) return s"
+ },
+ {
+  "id": "G-HOLD-chosen",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (!s.pressing || s.ctxPkg != null || s.closing || s.selecting != null) return s",
+  "replace": "if (!s.pressing || s.ctxPkg != null || s.closing) return s"
+ },
+ {
+  "id": "G-HOLD-card",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (item !is Item.Task && item !is Item.Pin) return s",
+  "replace": "if (item == null) return s"
+ },
+ {
+  "id": "G-HOLD-pin",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (item !is Item.Task && item !is Item.Pin) return s",
+  "replace": "if (item !is Item.Task) return s"
+ },
+ {
+  "id": "G-ROW-gear",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "            add(Item.Settings)\n",
+  "replace": "            if (false) add(Item.Settings)\n"
+ },
+ {
+  "id": "G-OK-gear",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (item == Item.Settings) return s to listOf(Effect.OpenSettings)",
+  "replace": "if (false) return s to listOf(Effect.OpenSettings)"
  }
 ]

@@ -27,6 +27,13 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.4 (same A50, 2026-11-08): keys sent by `tools/perf/rkey`, a uinput virtual remote (root) that holds a key so
+Android makes its own repeats, as the TV remote does. 1.3 reproduced the owner's report first: OK held 1.2 s pinned
+Gallery with no menu. 1.4: OK held 1.2 s / 1.5 s / 0.9 s → balloon open, nothing pinned; menu rows Pin, Unpin, Add to
+exceptions, App info, Settings each run only when chosen; held 450 ms = a tap → the app opens; hold → Back → OK opens
+the app; ⚙ tile (→ → OK) opens Settings and Back returns to the list; ↑ ↑ removes; Kill all keeps the pin and shows
+the placeholder.
+
 1.3 (same A50): picture screen lists OneDrive, My Files, Gallery, Files; grid of the device pictures newest first;
 a 6000×3375 photo picked from the grid → overlay with it in 126 ms, PSS back to ~61 MB 6 s after closing; a picture
 picked through the Files app with the D-pad. On the TV (read-only check, nothing launched): OPEN_DOCUMENT resolves to
