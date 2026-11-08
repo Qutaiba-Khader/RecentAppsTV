@@ -5,7 +5,8 @@ devices that ship with **no system "recent apps" screen**. It opens as a translu
 **over whatever is playing**, and lets you switch apps, remove one, or clear them all —
 with the **remote's arrow keys only**.
 
-The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root needed).
+The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root needed), with usage access as a
+backup when Shizuku isn't running.
 
 ![Recent apps overlay](docs/screenshots/overlay.jpg)
 
@@ -61,6 +62,25 @@ In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The scree
 position* and the colour swatches read left-to-right (→ means Right). On *Pinned apps* and *Exceptions*, **↑** from the
 first row reaches the *Unpin all* / *Hide all* / *Show all* buttons. On *Background image*, **↑** from the pictures
 reaches the picker apps (Gallery, Files…).
+
+## What's new in 1.7
+
+Tested end to end on the A50 with Shizuku in shell mode (the TV's identity), from a fresh install.
+
+- **Every recent app, not just the last few hours.** The TV hides any app unused for 6 hours from the system's "visible"
+  recents list (`config_activeTaskDurationHours=6`), so 1.6 showed 1–2 apps while the TV kept 47. The row now reads
+  everything the system stores (`dumpsys activity recents`) — on the owner's TV that is 25 apps instead of 1 — and each
+  one still **reopens where you left it**. Up to 20 apps are shown.
+- **Usage access, read when the row opens** — no background service (the system already keeps about 10 days of usage
+  events, and the TV's low-power standby would stop a background tracker anyway). It adds apps used in the last 3 days
+  that no longer own a task; apps that can resume always get a place first. The app **grants itself** usage access
+  through Shizuku the first time — the only question on first launch is Shizuku's *Allow*.
+- **Removed means removed.** ↑↑ (or Kill all) force-stops the app, removes all its tasks, and remembers it: it stays out
+  of the row — even out of the usage history — until you open it again.
+- **Works after a TV reboot, before Shizuku is back.** The row is built from the last list plus usage access (a yellow
+  line says so); apps open from their start screen, and anything you remove is killed for real as soon as Shizuku returns.
+- The Shizuku screen says *Allow Recent Apps in Shizuku* when Shizuku runs but the grant is missing; the ⚙ button steps
+  aside while the "press again to remove" hint is up; Kill all never touches a launcher task.
 
 ## What's new in 1.6
 
@@ -157,7 +177,8 @@ obtainium://app/%7B%22id%22%3A%22com.websnake.recentstv%22%2C%22url%22%3A%22http
 
 1. Install **Shizuku** on the TV and start it (wireless debugging or adb). See the Shizuku guide.
 2. Install **Recent Apps TV**: with ObtainX / Obtainium (above), or the APK from [Releases](../../releases).
-3. Open it once and choose **Open Shizuku & grant** → *Allow*.
+3. Open it once and choose **Open Shizuku & grant** → *Allow*. That is the only question; usage access is granted
+   automatically through Shizuku.
 4. Map a remote button to it (with a button-remapper app), using:
 
 ```
@@ -172,7 +193,8 @@ Upgrading from 1.0 keeps your settings. Reinstalling may ask for the Shizuku per
 ## Requirements
 
 - Android TV / Google TV, Android 7.0+ (minSdk 24)
-- Shizuku running, with access granted to this app
+- Shizuku running, with access granted to this app (without it, after a reboot, the row still works from the last list
+  and usage access, but apps open fresh and removals wait for Shizuku)
 
 ## How it works
 
@@ -181,7 +203,8 @@ All privileged work sits in `RecentTasksRepository`, through the Shizuku shell i
 
 | Action | How |
 |---|---|
-| read | the system recents list: `IActivityTaskManager.getRecentTasks(max, RECENT_IGNORE_UNAVAILABLE, user)` (shell holds `REAL_GET_TASKS`), most recent first — what SystemUI / Launcher3 read; falls back to the root tasks over the binder, then `am stack list`, then `dumpsys activity recents` |
+| read | everything the system stores: `dumpsys activity recents` (the store's order; home, excluded and unavailable tasks dropped), checked against `getRecentTasks` — the TV's visible list hides tasks unused for 6 h. Plus usage access (`UsageStatsManager.queryEvents`, only the events since the last open) for apps used in the last 3 days without a task, and a removal ledger so a removed app stays out until it is used again (`logic/Stored.kt`) |
+| Shizuku off | the last row saved on disk + usage access; apps open by their launch intent; removals are queued and replayed (force-stop + `removeTask`) when Shizuku is back |
 | switch | after the select zoom: `startActivityFromRecents(taskId)` (as the recents screen; `START_TASKS_FROM_RECENTS`), else `moveTaskToFront`, else the app's launch intent (a pinned app that isn't running) |
 | remove | force-stop (optional), then `removeTask` for **every** task of that app |
 | kill all | the same for every running app shown (pins included); the pins stay in the row |
@@ -191,8 +214,8 @@ is plain Kotlin in `logic/`, with no Android types, so it is tested on the compu
 
 ```
 com.websnake.recentstv
-├─ logic/        Overlay (keys → state + effects), TaskList, Settings, SettingsNav, Geometry   ← fully tested
-├─ data/         RecentTasksRepository (Shizuku), PackageRepository (icons, labels, colours, cached), SettingsStore,
+├─ logic/        Overlay (keys → state + effects), Stored (row sources), TaskList, Settings, SettingsNav, Geometry ← fully tested
+├─ data/         RecentTasksRepository (Shizuku), RowStore (ledger, seed, usage), PackageRepository (icons, labels, colours, cached), SettingsStore,
 │                ImageSources (picker apps + device pictures), BackdropImage (crop + scale once)
 ├─ ui/           theme, overlay row + pins, select zoom, hold menu, toast, settings + app lists, empty and Shizuku screens
 ├─ RecentsActivity   the overlay window: runs the effects, never finishes (steps aside → instant reopen)
@@ -206,8 +229,8 @@ Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every c
 ## Tests — the flow map
 
 The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
-fails the build on any line or branch that no test runs. 150 tests, 100 % of lines and branches; the critical conditions
-are mutation-tested (each one is removed in a copy and a test must fail: 42 of 42 caught).
+fails the build on any line or branch that no test runs. 170 tests, 100 % of lines and branches; the critical conditions
+are mutation-tested (each one is removed in a copy and a test must fail: 50 of 50 caught).
 
 Remote input is tested on a real device as well, with `tools/perf/rkey` — a tiny virtual remote (uinput, root) that
 holds keys the way a TV remote does, so Android sends its own key repeats. (`adb shell input keyevent --longpress` sends

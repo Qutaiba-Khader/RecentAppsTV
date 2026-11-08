@@ -248,7 +248,8 @@ fun RecentsOverlay(
         LaunchedEffect(killLeft) {
             if (gearLeft.targetValue != killLeft) gearLeft.animateTo(killLeft, tween(Motion.FOCUS_MS, easing = Motion.standard))
         }
-        val gone = animateFloatAsState(if (state.killing) 0f else 1f, tween(200), label = "gearGone")
+        // also out of the way while the "Press again to remove" pill is up: next to Kill all they overlapped (A50)
+        val gone = animateFloatAsState(if (state.killing || state.peek != PEEK_NONE) 0f else 1f, tween(200), label = "gearGone")
         val dim = animateFloatAsState(if (menuOpen) DIMMED else 1f, tween(200), label = "gearDim")
         val lift = with(density) { (cardDp * 1.18f * Motion.KILL_FOCUS_SCALE / 2f + GEAR_GAP + GEAR_H / 2f).toPx() }
         Box(

@@ -27,6 +27,15 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.7 release run (same A50, 2026-11-09, Shizuku in **shell** mode, `rkey` for holds): uninstall + fresh install →
+one screen ("Allow Recent Apps in Shizuku") → Shizuku's Allow → row; usage access granted by the app itself; 3 hot + 2 cold
+reopens: no permission screen again, usage access still allowed. ↑↑ on Gallery → process dead, 0 tasks, absent after a
+hot and a cold reopen, back after launching it. Kill all → every app in the row force-stopped (event log) and its tasks
+removed; empty row hot and cold; Play Store (not in the 20-app row) untouched. Hold OK 1.3 s → balloon; Pin, Unpin,
+Add to exceptions, App info; ↑ on Kill all → ⚙ → Settings → Back. Shizuku stopped → Gallery opened → limited row (92 ms)
+→ ↑↑ Gallery hidden (still running: nothing can kill it without Shizuku) → Shizuku back → Gallery force-stopped and its
+task removed → relaunched → back in the row.
+
 1.7 test build (same A50, 2026-11-09, Shizuku in **shell** mode): usage access cleared first → granted by the app itself on
 open; row mode=STORED (13 stored + usage, 20 apps), reopen 0.18–0.33 s (store read ~140 ms: dumpsys itself 70–98 ms);
 OK on Clock → startActivityFromRecents=0; ↑↑ on a usage-only app (Calendar) → stays out after reopening; Kill all → only

@@ -136,11 +136,14 @@ class RecentTasksRepository(private val context: Context) {
 
     /**
      * Removals made while Shizuku was off ([pending]: package → when): remove every stored task of that package
-     * that was not used again after the removal. Returns how many tasks were removed.
+     * that was not used again after the removal, force-stopping it first when [forceStop]. Returns how many tasks were removed.
      */
-    fun replayPending(pending: Map<String, Long>, now: Long): Int {
+    fun replayPending(pending: Map<String, Long>, now: Long, forceStop: Boolean): Int {
         if (!ready() || pending.isEmpty()) return 0
         val stored = Stored.candidates(Stored.parse(execShell("dumpsys activity recents")), now)
+        // an app used again after its removal keeps running and keeps its task
+        val reused = stored.filter { t -> pending[t.pkg]?.let { t.lastUsed > it } == true }.mapTo(HashSet()) { it.pkg }
+        if (forceStop) for (p in pending.keys) if (p !in reused) forceStop(p)
         var n = 0
         for (t in stored) {
             val at = pending[t.pkg] ?: continue

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.7 — test build (2026-11-09, not released)
+## 1.7 — 2026-11-09
 
 - The row reads every task the system stores (`dumpsys activity recents` through Shizuku), not only the "visible" few:
   the TV hides tasks unused for 6 h from that list (2 shown while 47 were stored). Each stored app still reopens where it was.
@@ -10,7 +10,9 @@
 - Shizuku off (after a TV reboot): the row is built from the last saved list + usage access and apps open from their start
   screen; removals are queued and done when Shizuku is back. The gate says "Allow Recent Apps in Shizuku" when only the grant is missing.
 - Up to 20 apps; apps with a task always get a place before usage-only apps. Kill all never removes a home task.
-- Reopen on the A50 (Shizuku in shell mode): 0.18–0.33 s.
+- A removal queued while Shizuku was off also force-stops the app when it is replayed (unless the app was used again).
+- The ⚙ button fades out while the "press again to remove" hint is up (they overlapped next to Kill all).
+- Reopen on the A50 (Shizuku in shell mode): 0.18–0.33 s; with Shizuku off ~0.1 s.
 
 ## 1.6 — 2026-11-08
 - Data methods checked against AOSP (SystemUI ActivityManagerWrapper, WM Shell RecentTasksController, Launcher3) and on the

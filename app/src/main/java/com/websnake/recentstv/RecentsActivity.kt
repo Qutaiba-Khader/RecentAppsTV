@@ -246,7 +246,7 @@ class RecentsActivity : ComponentActivity() {
             // with Shizuku: first replay removals made while it was off, then read the store; usage meanwhile
             val tasksDef = if (ready) async(Dispatchers.IO) {
                 val pending = rows.pending()
-                if (pending.isNotEmpty()) { repo.replayPending(pending, now); rows.clearPending() }
+                if (pending.isNotEmpty()) { repo.replayPending(pending, now, sDef.await().forceStopOnKill); rows.clearPending() }
                 repo.readStoredRow(now).also { tRaw = SystemClock.uptimeMillis() - t0 }
             } else null
             val usageDef = if (ready) async(Dispatchers.IO) {
