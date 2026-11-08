@@ -21,7 +21,7 @@ sealed interface Item {
     val key: String
     val taskId: Int?
     data object KillAll : Item { override val key = "#killall"; override val taskId: Int? = null }
-    /** The ⚙ tile at the right end of the row: opens Settings. */
+    /** The ⚙ Settings button: above Kill All (reached with UP), or at the right end of the row when Kill All isn't shown. */
     data object Settings : Item { override val key = "#settings"; override val taskId: Int? = null }
     data class Task(val ref: TaskRef) : Item { override val key get() = ref.pkg; override val taskId: Int? get() = ref.taskId }
     /** A pinned app; [taskId] is its running task, null when it isn't running. */
@@ -52,6 +52,7 @@ data class OvState(
     val ctxSel: Int = 0,
     val longPress: Boolean = false,           // this OK press already did its job (opened the menu / ran a menu row)
     val pressing: Boolean = false,            // OK is down on a card (press-in feedback)
+    val gear: Boolean = false,                // focus is on the ⚙ button above Kill All
     val busy: Boolean = false,                // switching / clearing: ignore input
     val selecting: String? = null,            // package chosen with OK: the select zoom is playing
     val shzFocus: Int = 0,                    // gate: 0 = open & grant, 1 = retry
@@ -64,10 +65,11 @@ data class OvState(
 
     val hasKillAll get() = showKillAll && tasks.isNotEmpty()
 
-    /** Logical order, right → left: [⚙] [Kill All] [pins if right] [tasks…] [pins if left]. */
+    /** Logical order, right → left: [Kill All] [pins if right] [tasks…] [pins if left].
+     *  The ⚙ button sits above Kill All; without Kill All it takes the first place in the row. */
     val items: List<Item> by lazy {
         buildList {
-            add(Item.Settings)
+            if (!hasKillAll) add(Item.Settings)
             if (hasKillAll) add(Item.KillAll)
             if (pinRight) addAll(pins)
             tasks.forEach { add(Item.Task(it)) }
@@ -80,7 +82,9 @@ data class OvState(
 
     val itemCount get() = items.size
     fun itemAt(i: Int): Item? = items.getOrNull(i)
-    val focusedItem: Item? get() = if (scene == Scene.OVERLAY) itemAt(focus) else null
+    /** The ⚙ above Kill All counts only while Kill All is shown and focused. */
+    val gearFocused get() = gear && scene == Scene.OVERLAY && hasKillAll && itemAt(focus) == Item.KillAll
+    val focusedItem: Item? get() = if (scene != Scene.OVERLAY) null else if (gearFocused) Item.Settings else itemAt(focus)
     fun indexOf(key: String) = items.indexOfFirst { it.key == key }
     val ctxItem: Item? get() = ctxPkg?.let { k -> items.firstOrNull { it.key == k } }
 }
@@ -120,7 +124,7 @@ object Overlay {
     /** Route to Empty when nothing is left; otherwise keep focus on [follow] if it is still there. */
     private fun settle(s: OvState, follow: String?, at: Int = -1): OvState {
         if (s.tasks.isEmpty() && s.pins.isEmpty()) return s.copy(scene = Scene.EMPTY, focus = 0, peek = PEEK_NONE)
-        val n = s.copy(scene = Scene.OVERLAY)
+        val n = s.copy(scene = Scene.OVERLAY, gear = false)
         val i = follow?.let { n.indexOf(it) } ?: -1
         val focus = when {
             i >= 0 -> i
@@ -188,14 +192,19 @@ object Overlay {
         return when (b) {
             Btn.RIGHT -> move(s.copy(peek = PEEK_NONE), -1) to emptyList()     // RTL: toward Kill All
             Btn.LEFT -> move(s.copy(peek = PEEK_NONE), +1) to emptyList()      // toward older apps
-            Btn.UP -> dismissStep(s, PEEK_UP) to emptyList()
-            Btn.DOWN -> dismissStep(s, PEEK_DOWN) to emptyList()
+            // Kill All ↑ = the ⚙ above it; ⚙ ↓ = back to Kill All
+            Btn.UP -> (if (s.focusedItem == Item.KillAll) s.copy(gear = true, peek = PEEK_NONE) else dismissStep(s, PEEK_UP)) to emptyList()
+            Btn.DOWN -> (if (s.gearFocused) s.copy(gear = false) else dismissStep(s, PEEK_DOWN)) to emptyList()
             else -> s to emptyList()
         }
     }
 
-    private fun move(s: OvState, d: Int): OvState =
-        s.copy(focus = (s.focus + d).coerceIn(0, (s.itemCount - 1).coerceAtLeast(0)))
+    private fun move(s0: OvState, d: Int): OvState {
+        // from the ⚙: RIGHT stays (nothing to its right), LEFT goes on like from Kill All
+        if (s0.gearFocused && d < 0) return s0
+        val s = s0.copy(gear = false)
+        return s.copy(focus = (s.focus + d).coerceIn(0, (s.itemCount - 1).coerceAtLeast(0)))
+    }
 
     /** Two presses in one direction: peek, then fly off. Only running tasks can be swiped away. */
     private fun dismissStep(s: OvState, dir: Int): OvState {

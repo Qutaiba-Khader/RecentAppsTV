@@ -41,8 +41,15 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 | G-HOLD-gone | HOLD | a timer after the overlay started closing opens nothing | a timer after the overlay started closing opens nothing | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-HOLD-chosen | HOLD | a timer after an app was chosen opens nothing | a timer after an app was chosen opens nothing | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-HOLD-pin | HOLD | a hold on a pin opens its menu | a hold on a pin opens its menu | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
-| G-ROW-gear | ROW | the gear tile is always first in the row | the gear tile is always first in the row | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-gear | ROW | the gear is in the row only when Kill All is not shown | the gear is in the row only when Kill All is not shown | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-OK-gear | OK | OK on the gear opens Settings, on a task it opens the app | OK on the gear opens Settings, on a task it opens the app | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-GEAR-up | GEAR | UP from Kill All focuses the gear, from a task it peeks | UP from Kill All focuses the gear, from a task it peeks | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-GEAR-down | GEAR | DOWN from the gear returns to Kill All, from a task it peeks | DOWN from the gear returns to Kill All, from a task it peeks | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-GEAR-right | GEAR | RIGHT on the gear stays, on a task it moves | RIGHT on the gear stays, on a task it moves | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-GEAR-flag | GEAR | the gear is focused only after UP | the gear is focused only after UP | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-GEAR-scene | GEAR | the gear counts only in the overlay scene | the gear counts only in the overlay scene | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-GEAR-shown | GEAR | the gear above Kill All counts only while Kill All is shown | the gear above Kill All counts only while Kill All is shown | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-GEAR-focus | GEAR | the gear counts only while focus is on Kill All | the gear counts only while focus is on Kill All | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 
 ## Mode combinations
 

@@ -27,7 +27,7 @@ class GatesTest {
     }
 
     @Test fun `G-OK-btn other keys never enter the OK path`() {
-        assertEquals(3, press(ready(a, b), Btn.LEFT).first.focus)
+        assertEquals(2, press(ready(a, b), Btn.LEFT).first.focus)
     }
 
     @Test fun `G-OK-busy a hold while switching opens no menu`() {
@@ -70,8 +70,8 @@ class GatesTest {
     }
 
     @Test fun `G-HOLD-card a hold on Kill All or the gear opens nothing, on a task it does`() {
-        assertNull(Overlay.holdElapsed(ready(a).copy(focus = 1, pressing = true)).ctxPkg)
         assertNull(Overlay.holdElapsed(ready(a).copy(focus = 0, pressing = true)).ctxPkg)
+        assertNull(Overlay.holdElapsed(ready(a).copy(focus = 0, gear = true, pressing = true)).ctxPkg)
         assertEquals("app.a", hold(ready(a)).ctxPkg)
     }
 
@@ -97,19 +97,54 @@ class GatesTest {
     }
 
     // ── the ⚙ tile (1.4): the visible way into Settings ──
-    @Test fun `G-ROW-gear the gear tile is always first in the row`() {
-        assertEquals(Item.Settings, ready(a).items.first())
+    @Test fun `G-ROW-gear the gear is in the row only when Kill All is not shown`() {
+        assertFalse(ready(a).items.contains(Item.Settings))
         assertEquals(Item.Settings, ready(pins = listOf("p.x")).items.first())
     }
 
+    @Test fun `G-GEAR-up UP from Kill All focuses the gear, from a task it peeks`() {
+        assertTrue(press(ready(a).copy(focus = 0), Btn.UP).first.gearFocused)
+        assertEquals(PEEK_UP, press(ready(a), Btn.UP).first.peek)
+    }
+
+    @Test fun `G-GEAR-down DOWN from the gear returns to Kill All, from a task it peeks`() {
+        val g = press(ready(a).copy(focus = 0), Btn.UP).first
+        assertEquals(Item.KillAll, press(g, Btn.DOWN).first.focusedItem)
+        assertEquals(PEEK_DOWN, press(ready(a), Btn.DOWN).first.peek)
+    }
+
+    @Test fun `G-GEAR-right RIGHT on the gear stays, on a task it moves`() {
+        val g = press(ready(a).copy(focus = 0), Btn.UP).first
+        assertTrue(press(g, Btn.RIGHT).first.gearFocused)
+        assertEquals(0, press(ready(a), Btn.RIGHT).first.focus)
+    }
+
+    private fun gearUp() = press(ready(a).copy(focus = 0), Btn.UP).first
+
+    @Test fun `G-GEAR-flag the gear is focused only after UP`() {
+        assertTrue(gearUp().gearFocused); assertFalse(gearUp().copy(gear = false).gearFocused)
+    }
+
+    @Test fun `G-GEAR-scene the gear counts only in the overlay scene`() {
+        assertTrue(gearUp().gearFocused); assertFalse(gearUp().copy(scene = Scene.EMPTY).gearFocused)
+    }
+
+    @Test fun `G-GEAR-shown the gear above Kill All counts only while Kill All is shown`() {
+        assertTrue(gearUp().gearFocused); assertFalse(gearUp().copy(showKillAll = false).gearFocused)
+    }
+
+    @Test fun `G-GEAR-focus the gear counts only while focus is on Kill All`() {
+        assertTrue(gearUp().gearFocused); assertFalse(gearUp().copy(focus = 1).gearFocused)
+    }
+
     @Test fun `G-OK-gear OK on the gear opens Settings, on a task it opens the app`() {
-        assertEquals(listOf(Effect.OpenSettings), release(ready(a).copy(focus = 0), Btn.OK).second)
+        assertEquals(listOf(Effect.OpenSettings), release(press(ready(a).copy(focus = 0), Btn.UP).first, Btn.OK).second)
         assertEquals(listOf(Effect.Switch("app.a", 11)), release(ready(a), Btn.OK).second)
     }
 
     // ── G-INPUT: the overlay ignores input while it is changing ──
     @Test fun `G-INPUT-busy no focus move while switching`() {
-        assertEquals(2, press(ready(a, b).copy(busy = true), Btn.LEFT).first.focus)
+        assertEquals(1, press(ready(a, b).copy(busy = true), Btn.LEFT).first.focus)
     }
 
     @Test fun `G-INPUT-killing no peek during Kill All`() {
@@ -124,12 +159,12 @@ class GatesTest {
     @Test fun `G-INPUT-selecting the select zoom swallows every key`() {
         val s = ready(a, b).copy(selecting = "app.a")
         assertEquals(s, press(s, Btn.LEFT).first)
-        assertEquals(3, press(ready(a, b), Btn.LEFT).first.focus)
+        assertEquals(2, press(ready(a, b), Btn.LEFT).first.focus)
     }
 
     // ── G-DISMISS: only a running task can be swiped away ──
     @Test fun `G-DISMISS-task a pin never peeks, a task does`() {
-        assertEquals(PEEK_NONE, press(ready(a, pins = listOf("p.x")).copy(focus = 3), Btn.DOWN).first.peek)
+        assertEquals(PEEK_NONE, press(ready(a, pins = listOf("p.x")).copy(focus = 2), Btn.DOWN).first.peek)
         assertEquals(PEEK_DOWN, press(ready(a, pins = listOf("p.x")), Btn.DOWN).first.peek)
     }
 

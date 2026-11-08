@@ -20,7 +20,11 @@ The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root
 </tr>
 <tr>
 <td><img src="docs/screenshots/kill-all.jpg" alt="Kill all focused"><br><sub><b>Kill all</b> — clears running apps; pins stay</sub></td>
+<td><img src="docs/screenshots/settings-button.jpg" alt="Settings button above Kill all"><br><sub><b>↑ on Kill all</b> — the ⚙ Settings button above it (on a device)</sub></td>
+</tr>
+<tr>
 <td><img src="docs/screenshots/empty-with-pins.jpg" alt="Only pins"><br><sub><b>Nothing running</b> — your pins are still one press away</sub></td>
+<td><img src="docs/screenshots/menu-device.jpg" alt="Hold OK menu on a device"><br><sub><b>Hold OK</b> on a device — the balloon stays open until you choose</sub></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/settings.jpg" alt="Settings"><br><sub><b>Settings</b> — overlay, pinned apps, background, hidden apps</sub></td>
@@ -42,25 +46,36 @@ The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root
 
 | Key | In the list |
 |---|---|
-| **← / →** | move between apps (→ goes toward newer apps, **Kill all**, then the **⚙ Settings** tile at the right end) |
-| **OK** | open that app · on **Kill all**: clear running apps (pins stay) · on **⚙**: open Settings |
+| **← / →** | move between apps (→ goes toward newer apps and **Kill all**) |
+| **↑** on **Kill all** | the **⚙ Settings** button above it (**↓** back to Kill all, **←** on to the apps) |
+| **OK** | open that app · on **Kill all**: clear running apps (pins stay) · on **⚙ Settings**: open Settings |
 | **Hold OK** (about half a second) | a balloon menu above the app: *Pin to row / Unpin* · *Add to exceptions* · *App info* · *Settings* — it stays open after you let go; **↑ / ↓** pick, **OK** runs, **Back** closes |
 | **↑ ↑** or **↓ ↓** | remove that app (first press lifts the card with a hint, second press sends it off) — pinned apps can't be removed this way |
 | **Back** | close the menu, or close the list (the app underneath carries on) |
-| **Menu** | settings |
+| **Menu** | settings (remotes that have the key) |
+
+When *Kill all* isn't shown (nothing running, or turned off in Settings), the ⚙ button takes its place at the right end
+of the row: **→** to it, then **OK**.
 
 In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The screen reads right-to-left as in the design; *Pinned
 position* and the colour swatches read left-to-right (→ means Right). On *Pinned apps* and *Exceptions*, **↑** from the
 first row reaches the *Unpin all* / *Hide all* / *Show all* buttons. On *Background image*, **↑** from the pictures
 reaches the picker apps (Gallery, Files…).
 
+## What's new in 1.5
+
+- **⚙ Settings now sits above Kill all.** Go to *Kill all* (→), press **↑** to reach *Settings*, **OK** opens it;
+  **↓** goes back. With no *Kill all* on screen the button stays at the right end of the row, so Settings is always
+  reachable. (1.4 put it in the row after Kill all.)
+
 ## What's new in 1.4
 
 - **Hold OK works on a real remote.** In 1.3, holding OK on the TV pinned the app at once and no menu was seen: the
   remote repeats a held OK about every 50 ms, and a repeat ran the menu's first row (*Pin*) the moment it opened. The
   hold is now timed (550 ms, as in the design), key repeats are ignored, and the balloon stays open until you choose.
-- **⚙ Settings tile** at the right end of the row (after *Kill all*), so Settings is always one press away — the
-  Google TV remote has no Menu key. The hold menu's *Settings* row still works too.
+- **A way into Settings on every remote**: 1.2 and 1.3 put Settings only in the hold menu (and the Menu key, which the
+  Google TV remote doesn't have). 1.4 added a ⚙ tile to the row; 1.5 moved it above Kill all. The hold menu's
+  *Settings* row works too.
 
 ## What's new in 1.3
 
@@ -137,7 +152,7 @@ com.websnake.recentstv/.RecentsActivity        (or the action com.websnake.recen
 ```
 
 It also appears as a normal app in the launcher, and publishes a launcher shortcut. There is deliberately no
-"how to open" option inside the app. Settings: the ⚙ tile at the right end of the row, hold OK → *Settings*, the **Menu** key, or `com.websnake.recentstv/.SettingsActivity`.
+"how to open" option inside the app. Settings: **↑** on *Kill all* → ⚙ *Settings*, hold OK → *Settings*, the **Menu** key, or `com.websnake.recentstv/.SettingsActivity`.
 
 Upgrading from 1.0 keeps your settings. Reinstalling may ask for the Shizuku permission again.
 
@@ -178,8 +193,12 @@ Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every c
 ## Tests — the flow map
 
 The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
-fails the build on any line or branch that no test runs. 130 tests, 100 % of lines and branches; the critical conditions
-are mutation-tested (each one is removed in a copy and a test must fail: 25 of 25 caught).
+fails the build on any line or branch that no test runs. 143 tests, 100 % of lines and branches; the critical conditions
+are mutation-tested (each one is removed in a copy and a test must fail: 41 of 41 caught).
+
+Remote input is tested on a real device as well, with `tools/perf/rkey` — a tiny virtual remote (uinput, root) that
+holds keys the way a TV remote does, so Android sends its own key repeats. (`adb shell input keyevent --longpress` sends
+a single repeat; that is how the 1.3 hold bug slipped through.)
 
 ```bash
 ./gradlew :app:testDebugUnitTest                 # the tests

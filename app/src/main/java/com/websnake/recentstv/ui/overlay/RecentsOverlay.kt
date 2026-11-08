@@ -81,7 +81,9 @@ private val FLY = 350.dp
 private val LABEL_GAP = 15.dp         // design: 30px → 40px below the card as it fades in
 private val MENU_SHIFT = 97.dp        // row slides down while the long-press menu is open
 private val EMPTY_SLOT_W = 320.dp
-private const val SETTINGS_TILE = 0.86f   // ⚙ tile width, × card size
+private const val SETTINGS_TILE = 0.86f   // ⚙ tile width, × card size (in the row, when Kill All isn't shown)
+private val GEAR_H = 38.dp                 // ⚙ Settings button above Kill All
+private val GEAR_GAP = 16.dp
 private val MENU_EST_H = 240.dp        // long-press menu height (header + 4 rows)
 private const val DIMMED = 0.32f
 
@@ -194,7 +196,7 @@ fun RecentsOverlay(
                 if (leftAnim.targetValue != left) leftAnim.animateTo(left, tween(Motion.FOCUS_MS, easing = Motion.standard))
             }
             val item = slot.item
-            val focused = item != null && state.scene == Scene.OVERLAY && slot.logical == state.focus
+            val focused = item != null && state.scene == Scene.OVERLAY && slot.logical == state.focus && !state.gearFocused
             val chosen = selecting != null && slot.key == selecting
             val dim = animateFloatAsState(
                 if (menuOpen && slot.key != state.ctxPkg) DIMMED else 1f, tween(200), label = "dim",
@@ -235,6 +237,28 @@ fun RecentsOverlay(
                 }
             }
         }
+    }
+
+    // ── the ⚙ Settings button above Kill All (↑ from Kill All) ──
+    val killVisual = slots.indexOfFirst { it.item == Item.KillAll }
+    if (killVisual >= 0) {
+        val killLeft = strip.lefts[killVisual]
+        val gearLeft = remember(loadId) { Animatable(killLeft) }
+        LaunchedEffect(killLeft) {
+            if (gearLeft.targetValue != killLeft) gearLeft.animateTo(killLeft, tween(Motion.FOCUS_MS, easing = Motion.standard))
+        }
+        val gone = animateFloatAsState(if (state.killing) 0f else 1f, tween(200), label = "gearGone")
+        val dim = animateFloatAsState(if (menuOpen) DIMMED else 1f, tween(200), label = "gearDim")
+        val lift = with(density) { (cardDp * 1.18f * Motion.KILL_FOCUS_SCALE / 2f + GEAR_GAP + GEAR_H / 2f).toPx() }
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .graphicsLayer {
+                    translationX = (gearLeft.value + tx.value).roundToInt().toFloat()
+                    translationY = (shift.value - lift).roundToInt().toFloat()
+                    alpha = gone.value * dim.value * chrome.value
+                },
+        ) { SettingsButton(state.gearFocused, cardDp * 1.34f) }
     }
 
     // ── long-press menu, above the target card ──
@@ -665,6 +689,48 @@ private fun SettingsTile(focused: Boolean, cardDp: Dp, cardShape: Shape) {
                 contentDescription = "Settings",
                 colorFilter = ColorFilter.tint(glyph),
                 modifier = Modifier.size(w * 0.38f),
+            )
+            Text("Settings", style = Type.small.copy(fontWeight = FontWeight.Bold), color = glyph, maxLines = 1, softWrap = false)
+        }
+    }
+}
+
+/** The ⚙ Settings button above Kill All: a pill as wide as Kill All. Neutral until focused (↑ from Kill All). */
+@Composable
+private fun SettingsButton(focused: Boolean, width: Dp) {
+    val accent = LocalAccent.current
+    val std = tween<Float>(Motion.FOCUS_MS, easing = Motion.standard)
+    val scale = animateFloatAsState(if (focused) Motion.KILL_FOCUS_SCALE else 1f, std, label = "pscale")
+    val f = animateFloatAsState(if (focused) 1f else 0f, std, label = "pfocus")
+    val glyph by animateColorAsState(if (focused) accent.onDark else Tokens.textDim, tween(Motion.FOCUS_MS), label = "pglyph")
+    val shape = RoundedCornerShape(GEAR_H / 2)
+    Box(Modifier.size(width, GEAR_H), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .requiredSize(width * 1.4f, GEAR_H * 2.4f)
+                .drawBehind {
+                    if (f.value > 0.01f) drawOval(
+                        Brush.radialGradient(listOf(accent.glow.copy(alpha = accent.glow.alpha * f.value), Color.Transparent)),
+                    )
+                },
+        )
+        Row(
+            Modifier
+                .size(width, GEAR_H)
+                .graphicsLayer { scaleX = scale.value; scaleY = scale.value; this.shape = shape; clip = true }
+                .drawBehind {
+                    val outline = shape.createOutline(size, layoutDirection, this)
+                    drawOutline(outline, lerp(Tokens.surface2, accent.base, f.value))
+                    drawOutline(outline, lerp(Tokens.line, accent.base, f.value), style = Stroke(2.dp.toPx()))
+                },
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_settings),
+                contentDescription = "Settings",
+                colorFilter = ColorFilter.tint(glyph),
+                modifier = Modifier.size(GEAR_H * 0.5f),
             )
             Text("Settings", style = Type.small.copy(fontWeight = FontWeight.Bold), color = glyph, maxLines = 1, softWrap = false)
         }

@@ -194,13 +194,55 @@
  {
   "id": "G-ROW-gear",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "            add(Item.Settings)\n",
-  "replace": "            if (false) add(Item.Settings)\n"
+  "find": "if (!hasKillAll) add(Item.Settings)",
+  "replace": "add(Item.Settings)"
  },
  {
   "id": "G-OK-gear",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
   "find": "if (item == Item.Settings) return s to listOf(Effect.OpenSettings)",
   "replace": "if (false) return s to listOf(Effect.OpenSettings)"
+ },
+ {
+  "id": "G-GEAR-up",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.focusedItem == Item.KillAll) s.copy(gear = true",
+  "replace": "if (false) s.copy(gear = true"
+ },
+ {
+  "id": "G-GEAR-down",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.gearFocused) s.copy(gear = false)",
+  "replace": "if (false) s.copy(gear = false)"
+ },
+ {
+  "id": "G-GEAR-right",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s0.gearFocused && d < 0) return s0",
+  "replace": "if (d < -9) return s0"
+ },
+ {
+  "id": "G-GEAR-flag",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "gear && scene == Scene.OVERLAY && hasKillAll && itemAt(focus) == Item.KillAll",
+  "replace": "scene == Scene.OVERLAY && hasKillAll && itemAt(focus) == Item.KillAll"
+ },
+ {
+  "id": "G-GEAR-scene",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "gear && scene == Scene.OVERLAY && hasKillAll && itemAt(focus) == Item.KillAll",
+  "replace": "gear && hasKillAll && itemAt(focus) == Item.KillAll"
+ },
+ {
+  "id": "G-GEAR-shown",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "gear && scene == Scene.OVERLAY && hasKillAll && itemAt(focus) == Item.KillAll",
+  "replace": "gear && scene == Scene.OVERLAY && itemAt(focus) == Item.KillAll"
+ },
+ {
+  "id": "G-GEAR-focus",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "gear && scene == Scene.OVERLAY && hasKillAll && itemAt(focus) == Item.KillAll",
+  "replace": "gear && scene == Scene.OVERLAY && hasKillAll"
  }
 ]

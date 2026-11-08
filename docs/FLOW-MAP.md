@@ -10,7 +10,7 @@ python3 tools/flow/flowmap.py update    # mechanical update: line numbers, skele
 ```
 
 <!-- TOTALS:START -->
-**Last clean pass 2026-11-08 19:36:56 +0300:** 103 paths, 34 gate tests · lines 409/409 (100.0%) · branches 451/451 (100.0%) · 0 justified, 0 unjustified.
+**Last clean pass 2026-11-08 19:48:40 +0300:** 105 paths, 41 gate tests · lines 413/413 (100.0%) · branches 471/471 (100.0%) · 0 justified, 0 unjustified.
 <!-- TOTALS:END -->
 
 ## Areas
@@ -60,7 +60,8 @@ outcome changes. Tests are named `G-<GATE>-<condition>`; `flow-map/mutants.json`
 | G-HOLD | Overlay.key / holdElapsed / ctx | key repeats never arm or open anything · the menu opens only from the HOLD_MS (550 ms) timer, while OK is still down (pressing), no menu open, not closing, nothing chosen · a card (task or pin) under focus · inside the menu a repeat, or the OK that opened it, runs no row · the release after a hold or a menu OK opens nothing | a held OK opens the balloon and keeps it open; no row runs by itself (TV find 1.3: the remote's ~50 ms repeats ran "Pin"); no stray app opens (A50 find, P-OVL-46) |
 | G-INPUT | Overlay.key / overlayKey | busy · killing · flying · selecting | the overlay ignores keys while it is changing |
 | G-DISMISS | Overlay.dismissStep | focused item is a running task · same direction twice | only tasks are swiped away, and only on the second press |
-| G-ROW | OvState.items / Overlay.settle | the ⚙ tile is always first · pinned running app leaves the tasks · Kill All needs the setting and a task · Empty needs no tasks and no pins | who sits in the row |
+| G-GEAR | OvState.gearFocused / overlayKey / move | UP on Kill All · DOWN on the ⚙ · RIGHT on the ⚙ stays · counts only with the flag, in the overlay, with Kill All shown and focused | the ⚙ Settings button above Kill All is reached and left with the D-pad |
+| G-ROW | OvState.items / Overlay.settle | the ⚙ is in the row (first) only when Kill All isn't shown · pinned running app leaves the tasks · Kill All needs the setting and a task · Empty needs no tasks and no pins | who sits in the row |
 | G-SELECT | TaskList.select | taskId > 0 · package not blank · first of its package · not excluded | which apps the user sees |
 | G-READ | TaskList.read | binder result present · at least two tasks | which source the list is trusted from |
 | G-CLAMP | Geometry.stripOffset | strip fits · clamp at both ends | Kill All never leaves the screen |

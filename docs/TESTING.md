@@ -27,6 +27,11 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.5 (same A50, 2026-11-08, `rkey`, on the released APK): → to Kill all, ↑ → Settings button focused, OK → Settings,
+Back → list; ↑ ↓ → Kill all again, OK clears; ↑ ← → newest app, OK opens it; hold OK 1.5 s → balloon, nothing pinned;
+pins only (no Kill all) → ⚙ at the right end of the row, → OK → Settings. README screenshots `settings-button.jpg` and
+`menu-device.jpg` taken in this run.
+
 1.4 (same A50, 2026-11-08): keys sent by `tools/perf/rkey`, a uinput virtual remote (root) that holds a key so
 Android makes its own repeats, as the TV remote does. 1.3 reproduced the owner's report first: OK held 1.2 s pinned
 Gallery with no menu. 1.4: OK held 1.2 s / 1.5 s / 0.9 s → balloon open, nothing pinned; menu rows Pin, Unpin, Add to

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5 — 2026-11-08
+- The ⚙ Settings button moved above Kill all: ↑ on Kill all focuses it, OK opens Settings, ↓ returns, ← goes on to the
+  apps. Without Kill all on screen it stays at the right end of the row.
+- README brought up to date for 1.2–1.5 (controls, what's new, device screenshots).
+- Tests: 143, 100 % lines and branches, 41 of 41 gate mutants caught.
+
 ## 1.4 — 2026-11-08
 - Fixed (found on the TV): holding OK pinned the app at once and never showed the balloon menu. A real remote repeats
   a held OK every ~50 ms and a repeat ran the menu's first row. Now the hold is a 550 ms timer (design), repeats of OK
