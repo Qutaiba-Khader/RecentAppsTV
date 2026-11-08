@@ -314,13 +314,25 @@
  {
   "id": "G-UPMENU-card",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "                else -> s\n            } to emptyList()",
-  "replace": "                else -> s.copy(ctxPkg = \"#x\")\n            } to emptyList()"
+  "find": "        if (item is Item.Task || item is Item.Pin) s.copy(ctxPkg = item.key, ctxSel = 0, longPress = false, peek = PEEK_NONE)\n        else s",
+  "replace": "        if (item != null) s.copy(ctxPkg = item.key, ctxSel = 0, longPress = false, peek = PEEK_NONE)\n        else s"
  },
  {
   "id": "G-UPMENU-pin",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
   "find": "CtxOption.CLOSE -> if (item is Item.Pin) {",
   "replace": "CtxOption.CLOSE -> if (false) {"
+ },
+ {
+  "id": "G-UPMENU-peek",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "else -> if (s.peek == PEEK_DOWN) s.copy(peek = PEEK_NONE) else upOnCard(s, item)",
+  "replace": "else -> upOnCard(s, item)"
+ },
+ {
+  "id": "G-UPMENU-bottom",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "Btn.DOWN -> (if (s.ctxSel <= 0) s.copy(ctxPkg = null, ctxSel = 0) else s.copy(ctxSel = s.ctxSel - 1)) to emptyList()",
+  "replace": "Btn.DOWN -> (if (s.ctxSel <= 1) s.copy(ctxPkg = null, ctxSel = 0) else s.copy(ctxSel = s.ctxSel - 1)) to emptyList()"
  }
 ]

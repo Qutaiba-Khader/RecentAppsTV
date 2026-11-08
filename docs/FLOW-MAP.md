@@ -10,7 +10,7 @@ python3 tools/flow/flowmap.py update    # mechanical update: line numbers, skele
 ```
 
 <!-- TOTALS:START -->
-**Last clean pass 2026-11-09 02:25:03 +0300:** 122 paths, 54 gate tests · lines 501/501 (100.0%) · branches 575/575 (100.0%) · 0 justified, 0 unjustified.
+**Last clean pass 2026-11-09 02:42:27 +0300:** 123 paths, 56 gate tests · lines 502/502 (100.0%) · branches 579/579 (100.0%) · 0 justified, 0 unjustified.
 <!-- TOTALS:END -->
 
 ## Areas
@@ -68,7 +68,7 @@ outcome changes. Tests are named `G-<GATE>-<condition>`; `flow-map/mutants.json`
 | G-CENTER | Geometry.stripOffset | short strip · either end of a long strip | the focused app is always in the middle (1.8) |
 | G-ROW (1.7) | Stored.candidates / merge / parse | home · excluded-from-recents bit · unavailable · used before its removal (tombstone, Kill all epoch) · a task keeps its id over usage · usage-only apps only fill the places tasks leave | which stored / usage apps reach the row |
 | G-TOGGLE | Overlay.relaunched | not closing · not opening an app | a second launch while shown closes the overlay |
-| G-UPMENU | Overlay.overlayKey / ctxKey | UP on a task or pin (not the gear) · Close on a pin vs a task | UP opens the menu; Close removes the app (a pin stays pinned) |
+| G-UPMENU | Overlay.overlayKey / ctxKey | UP on a task or pin (not the gear) · UP on a lowered card · DOWN on the bottom row · Close on a pin vs a task | UP opens the menu or puts a lowered card back; DOWN from Pin closes the menu; Close removes the app (a pin stays pinned) |
 
 ## The update rule
 

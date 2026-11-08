@@ -111,15 +111,16 @@ class OverlayTest {
     }
 
     @Test fun `P-OVL-14 UP on an app opens its menu (no hold), on a pin too, peek cleared`() {
-        val s = press(ready(a, b).copy(peek = PEEK_DOWN), Btn.UP).first
+        val s = press(ready(a, b).copy(peek = PEEK_UP), Btn.UP).first          // a stale up-peek is cleared too
         assertEquals("app.a", s.ctxPkg); assertEquals(0, s.ctxSel); assertFalse(s.longPress); assertEquals(PEEK_NONE, s.peek)
         assertEquals(listOf(Effect.SetPin("app.a", true)), press(s, Btn.OK).second)     // its first OK runs the row at once
         assertEquals("p.x", press(ready(a, pins = listOf("p.x")).copy(focus = 2), Btn.UP).first.ctxPkg)
     }
 
-    @Test fun `P-OVL-15 DOWN then UP - the menu opens instead of a second peek`() {
+    @Test fun `P-OVL-15 DOWN then UP - the lowered card goes back to normal, no menu, no removal`() {
         val s = press(press(ready(a, b), Btn.DOWN).first, Btn.UP).first
-        assertEquals(PEEK_NONE, s.peek); assertNull(s.flying); assertEquals("app.a", s.ctxPkg)
+        assertEquals(PEEK_NONE, s.peek); assertNull(s.flying); assertNull(s.ctxPkg)
+        assertEquals("app.a", press(s, Btn.UP).first.ctxPkg)                           // a second UP opens the menu
     }
 
     @Test fun `P-OVL-16 fly-off landing removes the task, keeps focus in place, then dismisses it`() {
@@ -235,11 +236,21 @@ class OverlayTest {
         assertEquals(listOf(Effect.ArmHold, Effect.Switch("app.a", 11)), tap(closed, Btn.OK).second)
     }
 
-    @Test fun `P-OVL-31 menu - UP DOWN clamp, LEFT RIGHT do nothing`() {
+    @Test fun `P-OVL-31 menu - bottom-up - UP climbs and stops at the top, DOWN steps back, LEFT RIGHT nothing`() {
         var m = release(menu(ready(a)), Btn.OK).first
-        m = press(m, Btn.UP).first; assertEquals(0, m.ctxSel)
-        repeat(6) { m = press(m, Btn.DOWN).first }; assertEquals(CtxOption.entries.size - 1, m.ctxSel)
+        assertEquals(0, m.ctxSel)                                                          // Pin, nearest the card
+        repeat(6) { m = press(m, Btn.UP).first }; assertEquals(CtxOption.entries.size - 1, m.ctxSel)
+        assertEquals(CtxOption.CLOSE, CtxOption.entries[m.ctxSel])
+        m = press(m, Btn.DOWN).first; assertEquals(CtxOption.entries.size - 2, m.ctxSel); assertEquals("app.a", m.ctxPkg)
         assertEquals(m, press(m, Btn.LEFT).first); assertEquals(m, press(m, Btn.RIGHT).first)
+    }
+
+    @Test fun `P-OVL-55 menu - DOWN on the bottom row closes it and the card is as before`() {
+        val m = press(ready(a, b), Btn.UP).first
+        val n = press(m, Btn.DOWN).first
+        assertNull(n.ctxPkg); assertEquals(0, n.ctxSel); assertEquals(PEEK_NONE, n.peek); assertNull(n.flying)
+        assertEquals(Item.Task(a), n.focusedItem)
+        assertEquals(listOf(Effect.ArmHold, Effect.Switch("app.a", 11)), tap(n, Btn.OK).second)   // OK opens the app again
     }
 
     @Test fun `P-OVL-32 menu - Pin moves a task into the pins and keeps focus on it`() {
@@ -267,30 +278,30 @@ class OverlayTest {
     }
 
     @Test fun `P-OVL-35 menu - Add to exceptions flies the card up, then it is gone (task or pin)`() {
-        val m = press(release(menu(ready(a, b, pins = listOf("p.x"))), Btn.OK).first, Btn.DOWN).first
+        val m = press(release(menu(ready(a, b, pins = listOf("p.x"))), Btn.OK).first, Btn.UP).first
         val (f, e) = press(m, Btn.OK)
         assertEquals("app.a", f.flying); assertEquals(PEEK_UP, f.flyDir); assertEquals(FlyReason.EXCEPTION, f.flyReason)
         assertEquals(listOf(Effect.AddException("app.a")), e)
         val (n, e2) = Overlay.flyComplete(f, "app.a")
         assertEquals(listOf(b), n.all); assertTrue(e2.isEmpty())
         val p = ready(a, pins = listOf("p.x")).copy(focus = 2)
-        val fp = press(press(release(menu(p), Btn.OK).first, Btn.DOWN).first, Btn.OK).first
+        val fp = press(press(release(menu(p), Btn.OK).first, Btn.UP).first, Btn.OK).first
         assertTrue(Overlay.flyComplete(fp, "p.x").first.pinned.isEmpty())
     }
 
     @Test fun `P-OVL-36 menu - App info opens it and closes the overlay - Close flies a task off`() {
         var m = release(menu(ready(a)), Btn.OK).first
-        repeat(2) { m = press(m, Btn.DOWN).first }
+        repeat(2) { m = press(m, Btn.UP).first }
         val (n, e) = press(m, Btn.OK)
         assertTrue(n.closing); assertEquals(listOf(Effect.AppInfo("app.a"), Effect.Close), e)
-        val (s, e2) = press(press(m, Btn.DOWN).first, Btn.OK)
+        val (s, e2) = press(press(m, Btn.UP).first, Btn.OK)
         assertNull(s.ctxPkg); assertTrue(e2.isEmpty())
         assertEquals("app.a", s.flying); assertEquals(FlyReason.DISMISS, s.flyReason); assertEquals(PEEK_UP, s.flyDir)
         assertEquals(listOf(Effect.Dismiss(a)), Overlay.flyComplete(s, "app.a").second)
     }
 
     @Test fun `P-OVL-54 menu - Close on a running pin removes its task and keeps the pin, on an idle pin does nothing`() {
-        val close = { st: OvState -> var m = press(st, Btn.UP).first; repeat(3) { m = press(m, Btn.DOWN).first }; press(m, Btn.OK) }
+        val close = { st: OvState -> var m = press(st, Btn.UP).first; repeat(3) { m = press(m, Btn.UP).first }; press(m, Btn.OK) }
         val (n, e) = close(ready(a, b, pins = listOf("app.b")).copy(focus = 2))                 // focus = pinned, running app.b
         assertEquals(listOf(Effect.Dismiss(b)), e); assertEquals(listOf("app.b"), n.pinned)
         assertEquals(listOf(a), n.all); assertNull(n.ctxPkg); assertNull(n.flying)
@@ -367,7 +378,7 @@ class OverlayTest {
     @Test fun `P-OVL-46 the release of an OK that ran a menu row opens nothing (A50 find)`() {
         for (sel in 0..3) {
             var m = release(menu(ready(a, b)), Btn.OK).first
-            repeat(sel) { m = press(m, Btn.DOWN).first }
+            repeat(sel) { m = press(m, Btn.UP).first }
             val ran = press(m, Btn.OK).first
             val (n, e) = release(ran, Btn.OK)
             assertTrue(e.isEmpty()); assertNull(n.selecting); assertTrue(n.closing || !n.longPress)   // App info closes: keys ignored

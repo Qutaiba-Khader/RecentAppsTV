@@ -31,7 +31,8 @@ sealed interface Item {
     }
 }
 
-/** Long-press menu rows, top to bottom. 1.8: actions on that one app only — Settings left (it has the ⚙), Close came. */
+/** Long-press menu rows, from the card up (1.9: drawn bottom-up — PIN sits nearest the card and is focused first).
+ *  1.8: actions on that one app only — Settings left (it has the ⚙), Close came. */
 enum class CtxOption { PIN, EXCEPTION, APP_INFO, CLOSE }
 
 enum class FlyReason { DISMISS, EXCEPTION }
@@ -205,13 +206,19 @@ object Overlay {
             // 1.8: UP on an app opens its menu, as holding OK does (DOWN twice still removes it)
             Btn.UP -> when (val item = s.focusedItem) {
                 Item.KillAll -> s.copy(gear = true, peek = PEEK_NONE)
-                is Item.Task, is Item.Pin -> s.copy(ctxPkg = item.key, ctxSel = 0, longPress = false, peek = PEEK_NONE)
-                else -> s
+                // 1.9: the card lowered by a first DOWN (about to be removed): UP puts it back, nothing else
+                else -> if (s.peek == PEEK_DOWN) s.copy(peek = PEEK_NONE) else upOnCard(s, item)
             } to emptyList()
+
             Btn.DOWN -> (if (s.gearFocused) s.copy(gear = false) else dismissStep(s, PEEK_DOWN)) to emptyList()
             else -> s to emptyList()
         }
     }
+
+    /** UP on an app or a pin opens its menu (as holding OK does); on the in-row ⚙ it does nothing. */
+    private fun upOnCard(s: OvState, item: Item?): OvState =
+        if (item is Item.Task || item is Item.Pin) s.copy(ctxPkg = item.key, ctxSel = 0, longPress = false, peek = PEEK_NONE)
+        else s
 
     private fun move(s0: OvState, d: Int): OvState {
         // from the ⚙: RIGHT stays (nothing to its right), LEFT goes on like from Kill All
@@ -259,8 +266,10 @@ object Overlay {
         val pkg = item.key
         val last = CtxOption.entries.size - 1
         return when (b) {
-            Btn.UP -> s.copy(ctxSel = (s.ctxSel - 1).coerceAtLeast(0)) to emptyList()
-            Btn.DOWN -> s.copy(ctxSel = (s.ctxSel + 1).coerceAtMost(last)) to emptyList()
+            // 1.9: the balloon is drawn bottom-up (row 0 = Pin, nearest the card): UP climbs it; DOWN on the bottom
+            // row closes it and the card is as before — a sub-menu of the card
+            Btn.UP -> s.copy(ctxSel = (s.ctxSel + 1).coerceAtMost(last)) to emptyList()
+            Btn.DOWN -> (if (s.ctxSel <= 0) s.copy(ctxPkg = null, ctxSel = 0) else s.copy(ctxSel = s.ctxSel - 1)) to emptyList()
             Btn.OK -> {
                 // longPress = true: this OK's release must not also open the app now under focus
                 val closed = s.copy(ctxPkg = null, longPress = true)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9 — 2026-11-09
+
+- Balloon drawn bottom-up (Close · App info · Add to exceptions · Pin to row); Pin, nearest the card, is focused first;
+  UP climbs, DOWN steps back and closes the balloon from Pin (`Overlay.ctxKey`).
+- UP on a card lowered by the first DOWN puts it back instead of opening the menu (`overlayKey`).
+- Close uses an ✕ icon (`ic_close`) instead of the bin.
+
 ## 1.8 — 2026-11-09
 
 - The button that opens the list closes it when pressed again: a second launch while the overlay shows closes it

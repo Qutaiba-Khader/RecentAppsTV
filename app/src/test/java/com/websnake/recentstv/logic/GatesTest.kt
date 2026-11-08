@@ -80,7 +80,7 @@ class GatesTest {
     }
 
     @Test fun `G-HOLD-open a timer while a menu is already open changes nothing`() {
-        val m = press(release(hold(ready(a, b)), Btn.OK).first, Btn.DOWN).first.copy(pressing = true)
+        val m = press(release(hold(ready(a, b)), Btn.OK).first, Btn.UP).first.copy(pressing = true)
         assertEquals(m, Overlay.holdElapsed(m))
     }
 
@@ -300,10 +300,23 @@ class GatesTest {
 
     @Test fun `G-UPMENU-pin Close on a pin keeps it pinned, on a task it flies off`() {
         var m = press(ready(a, pins = listOf("app.a")).copy(focus = 1), Btn.UP).first
-        repeat(3) { m = press(m, Btn.DOWN).first }
+        repeat(3) { m = press(m, Btn.UP).first }
         assertNull(press(m, Btn.OK).first.flying)
         var t = press(ready(a), Btn.UP).first
-        repeat(3) { t = press(t, Btn.DOWN).first }
+        repeat(3) { t = press(t, Btn.UP).first }
         assertEquals("app.a", press(t, Btn.OK).first.flying)
+    }
+
+    // ── 1.9: the balloon is a sub-menu of the card ──
+    @Test fun `G-UPMENU-peek UP on a lowered card puts it back, on a normal card it opens the menu`() {
+        val low = ready(a).copy(peek = PEEK_DOWN)
+        assertNull(press(low, Btn.UP).first.ctxPkg); assertEquals(PEEK_NONE, press(low, Btn.UP).first.peek)
+        assertEquals("app.a", press(ready(a), Btn.UP).first.ctxPkg)
+    }
+
+    @Test fun `G-UPMENU-bottom DOWN closes the menu only from the bottom row, higher rows step down`() {
+        val m = press(ready(a), Btn.UP).first
+        assertNull(press(m, Btn.DOWN).first.ctxPkg)
+        assertEquals("app.a", press(m.copy(ctxSel = 1), Btn.DOWN).first.ctxPkg)
     }
 }

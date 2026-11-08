@@ -16,7 +16,7 @@ backup when Shizuku isn't running.
 <td><img src="docs/screenshots/pinned.jpg" alt="Pinned apps"><br><sub><b>Pinned apps</b> — always in the row, running or not</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/menu.jpg" alt="Hold OK menu"><br><sub><b>↑ or Hold OK</b> — pin, hide, app info, close (design; 1.8 replaces Settings with Close)</sub></td>
+<td><img src="docs/screenshots/menu.jpg" alt="Hold OK menu"><br><sub><b>↑ or Hold OK</b> — pin, hide, app info, close (design; on the device the balloon reads from the card up)</sub></td>
 <td><img src="docs/screenshots/dismiss-peek.jpg" alt="Remove one app"><br><sub><b>↓ twice</b> — the card steps aside, the second press sends it off</sub></td>
 </tr>
 <tr>
@@ -25,7 +25,7 @@ backup when Shizuku isn't running.
 </tr>
 <tr>
 <td><img src="docs/screenshots/empty-with-pins.jpg" alt="Only pins"><br><sub><b>Nothing running</b> — your pins are still one press away</sub></td>
-<td><img src="docs/screenshots/menu-device.jpg" alt="Hold OK menu on a device"><br><sub><b>↑ or Hold OK</b> on a device — the balloon stays open until you choose</sub></td>
+<td><img src="docs/screenshots/menu-device.jpg" alt="Hold OK menu on a device"><br><sub><b>↑ or Hold OK</b> on a device — from the card up: Pin to row (focused), Add to exceptions, App info, Close</sub></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/settings.jpg" alt="Settings"><br><sub><b>Settings</b> — overlay, pinned apps, background, hidden apps</sub></td>
@@ -50,8 +50,8 @@ backup when Shizuku isn't running.
 | **← / →** | move between apps (→ goes toward newer apps and **Kill all**) — the focused app always sits in the middle of the screen |
 | **↑** on **Kill all** | the **⚙ Settings** button above it (**↓** back to Kill all, **←** on to the apps) |
 | **OK** | open that app · on **Kill all**: clear running apps (pins stay) · on **⚙ Settings**: open Settings |
-| **↑** or **Hold OK** (about half a second) | a balloon menu above the app: *Pin to row / Unpin* · *Add to exceptions* · *App info* · *Close* — it stays open after you let go; **↑ / ↓** pick, **OK** runs, **Back** closes |
-| **↓ ↓** | remove that app (first press moves the card down with a hint, second press sends it off) — pinned apps can't be removed this way; *Close* in the menu does the same, also for a running pinned app (it stays pinned) |
+| **↑** or **Hold OK** (about half a second) | the app's balloon menu, read from the card up: *Pin to row / Unpin* (focused first) · *Add to exceptions* · *App info* · *Close* (✕) — it stays open after you let go; **↑** climbs, **↓** steps back and on *Pin* closes it, **OK** runs, **Back** closes |
+| **↓ ↓** | remove that app (first press lowers the card with a hint — **↑** puts it back — second press sends it off); pinned apps can't be removed this way; *Close* in the menu does the same, also for a running pinned app (it stays pinned) |
 | **Back** | close the menu, or close the list (the app underneath carries on) |
 | **the button that opened it** | press it again to close the list (a toggle) — no key remapping inside the app |
 | **Menu** | settings (remotes that have the key) |
@@ -63,6 +63,14 @@ In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The scree
 position* and the colour swatches read left-to-right (→ means Right). On *Pinned apps* and *Exceptions*, **↑** from the
 first row reaches the *Unpin all* / *Hide all* / *Show all* buttons. On *Background image*, **↑** from the pictures
 reaches the picker apps (Gallery, Files…).
+
+## What's new in 1.9
+
+- **The balloon is a sub-menu of the card**, read from the bottom up: *Close* · *App info* · *Add to exceptions* ·
+  *Pin to row*. *Pin to row* sits nearest the card and has the focus when it opens; **↑** climbs, **↓** on *Pin to row*
+  closes the balloon and the card is as before.
+- **↑ on a lowered card** (after the first ↓) puts it back — nothing is removed.
+- *Close* has an **✕** icon (it was a bin).
 
 ## What's new in 1.8
 
@@ -244,8 +252,8 @@ Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every c
 ## Tests — the flow map
 
 The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
-fails the build on any line or branch that no test runs. 176 tests, 100 % of lines and branches; the critical conditions
-are mutation-tested (each one is removed in a copy and a test must fail: 54 of 54 caught).
+fails the build on any line or branch that no test runs. 179 tests, 100 % of lines and branches; the critical conditions
+are mutation-tested (each one is removed in a copy and a test must fail: 56 of 56 caught).
 
 Remote input is tested on a real device as well, with `tools/perf/rkey` — a tiny virtual remote (uinput, root) that
 holds keys the way a TV remote does, so Android sends its own key repeats. (`adb shell input keyevent --longpress` sends

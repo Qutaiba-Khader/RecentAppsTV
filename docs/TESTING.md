@@ -27,6 +27,12 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.9 (same A50, 2026-11-09, Shizuku in **shell** mode, `rkey`): ↑ on Calendar → balloon top→bottom Close (✕) · App
+info · Add to exceptions · Pin to row, Pin focused; ↑↑↑ → Close, ↓↓↓ → Pin, ↓ → balloon closed, card normal; ↓ (card
+lowered) then ↑ → card back, Calendar still running with its task; ↑×4 + OK (Close) → Calendar process dead, 0 tasks;
+↓↓ on Clock → dead, 0 tasks; hold OK 1.3 s → balloon with Pin focused, OK pinned; hold → ↓ closes it; second launch
+while shown still closes.
+
 1.8 (same A50, 2026-11-09, Shizuku in **shell** mode): explicit start / launcher intent / `OPEN_RECENTS` while shown →
 closes, while hidden → opens; with the menu open → closes. ↑ on an app → balloon Pin · Exceptions · App info · Close;
 Close on Clock → process dead, 0 tasks; ↓ ↓ still removes (Gallery force-stopped, task gone). Focus centred at both
