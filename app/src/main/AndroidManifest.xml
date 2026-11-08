@@ -71,6 +71,22 @@
             </intent-filter>
         </activity>
 
+        <!-- 1.8: "Open Recent Apps" in the shortcut lists of button mappers (tvQuickActions → Shortcuts…):
+             the legacy CREATE_SHORTCUT picker. Pressing the mapped button again while the overlay shows closes it. -->
+        <activity
+            android:name=".ShortcutActivity"
+            android:exported="true"
+            android:label="@string/shortcut_recents_long"
+            android:icon="@drawable/ic_launcher"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true">
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

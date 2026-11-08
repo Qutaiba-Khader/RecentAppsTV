@@ -27,6 +27,15 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.8 (same A50, 2026-11-09, Shizuku in **shell** mode): explicit start / launcher intent / `OPEN_RECENTS` while shown →
+closes, while hidden → opens; with the menu open → closes. ↑ on an app → balloon Pin · Exceptions · App info · Close;
+Close on Clock → process dead, 0 tasks; ↓ ↓ still removes (Gallery force-stopped, task gone). Focus centred at both
+ends. tvQuickActions 3.8.0 (Pro) refuses to run on the A50 (Play licence of the TV's account), so its picker was checked
+by code (its Shortcuts list = `queryIntentActivities(CREATE_SHORTCUT)`, stored as `EXTRA_SHORTCUT_INTENT.toUri()`, fired
+with `startActivity`) and on the device: the same query returns `ShortcutActivity`; One UI Home's widget list picked it
+("Open Recent Apps" 1×1), the placed shortcut opens the overlay; the stored intent fired twice → open / close. Frames
+(36 presses, `frames.sh`): 53–58 % slow, p50 17–19 ms, p90 34–36 ms vs 58–72 %, 19–22, 36–38 before the springs.
+
 1.7 release run (same A50, 2026-11-09, Shizuku in **shell** mode, `rkey` for holds): uninstall + fresh install →
 one screen ("Allow Recent Apps in Shizuku") → Shizuku's Allow → row; usage access granted by the app itself; 3 hot + 2 cold
 reopens: no permission screen again, usage access still allowed. ↑↑ on Gallery → process dead, 0 tasks, absent after a

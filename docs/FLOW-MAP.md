@@ -10,7 +10,7 @@ python3 tools/flow/flowmap.py update    # mechanical update: line numbers, skele
 ```
 
 <!-- TOTALS:START -->
-**Last clean pass 2026-11-09 01:45:43 +0300:** 120 paths, 50 gate tests · lines 492/492 (100.0%) · branches 565/565 (100.0%) · 0 justified, 0 unjustified.
+**Last clean pass 2026-11-09 02:25:03 +0300:** 122 paths, 54 gate tests · lines 501/501 (100.0%) · branches 575/575 (100.0%) · 0 justified, 0 unjustified.
 <!-- TOTALS:END -->
 
 ## Areas
@@ -65,7 +65,10 @@ outcome changes. Tests are named `G-<GATE>-<condition>`; `flow-map/mutants.json`
 | G-ROW | OvState.items / Overlay.settle | the ⚙ is in the row (first) only when Kill All isn't shown · pinned running app leaves the tasks · Kill All needs the setting and a task · Empty needs no tasks and no pins | who sits in the row |
 | G-SELECT | TaskList.select | taskId > 0 · package not blank · first of its package · not excluded | which apps the user sees |
 | G-READ | TaskList.read | the system recents list (getRecentTasks) is non-empty · else: binder root tasks present · at least two tasks | which source the list is trusted from |
-| G-CLAMP | Geometry.stripOffset | strip fits · clamp at both ends | Kill All never leaves the screen |
+| G-CENTER | Geometry.stripOffset | short strip · either end of a long strip | the focused app is always in the middle (1.8) |
+| G-ROW (1.7) | Stored.candidates / merge / parse | home · excluded-from-recents bit · unavailable · used before its removal (tombstone, Kill all epoch) · a task keeps its id over usage · usage-only apps only fill the places tasks leave | which stored / usage apps reach the row |
+| G-TOGGLE | Overlay.relaunched | not closing · not opening an app | a second launch while shown closes the overlay |
+| G-UPMENU | Overlay.overlayKey / ctxKey | UP on a task or pin (not the gear) · Close on a pin vs a task | UP opens the menu; Close removes the app (a pin stays pinned) |
 
 ## The update rule
 

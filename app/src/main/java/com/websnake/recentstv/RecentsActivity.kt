@@ -194,14 +194,32 @@ class RecentsActivity : ComponentActivity() {
         reload()                             // start reading now, not at onResume
     }
 
+    /**
+     * True from onResume until onStop: the overlay is on screen. A launch that arrives now is the user pressing the
+     * same button again (onPause → onNewIntent → onResume), so it closes the overlay. A launch that brings a hidden
+     * overlay back arrives after onStop cleared this (onRestart → onStart → onNewIntent → onResume) and opens it.
+     */
+    private var shown = false
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (!shown) return
+        val (n, effects) = Overlay.relaunched(st)
+        st = n
+        effects.forEach(::run)
+    }
+
     override fun onResume() {
         super.onResume()
+        shown = true
         // back from the Shizuku app / permission dialog: re-check
         if (st.scene == Scene.SHIZUKU) reload()
     }
 
     override fun onStop() {
         super.onStop()
+        shown = false
         // Hidden: hold nothing, so the next open starts clean (no stale frame) and the
         // process keeps no bitmaps or animations alive while asleep.
         reloadJob?.cancel()

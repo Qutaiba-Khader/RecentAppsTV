@@ -126,18 +126,6 @@
   "replace": "if (b != null) return b to TaskSource.BINDER"
  },
  {
-  "id": "G-CLAMP-fits",
-  "file": "app/src/main/java/com/websnake/recentstv/logic/Geometry.kt",
-  "find": "if (strip.total <= viewport) return",
-  "replace": "if (false) return"
- },
- {
-  "id": "G-CLAMP-ends",
-  "file": "app/src/main/java/com/websnake/recentstv/logic/Geometry.kt",
-  "find": ".coerceIn(viewport - strip.total, 0f)",
-  "replace": ""
- },
- {
   "id": "G-HOLD-repeat",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
   "find": "if (k.repeat > 0) return s to emptyList()",
@@ -206,8 +194,8 @@
  {
   "id": "G-GEAR-up",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "if (s.focusedItem == Item.KillAll) s.copy(gear = true",
-  "replace": "if (false) s.copy(gear = true"
+  "find": "                Item.KillAll -> s.copy(gear = true, peek = PEEK_NONE)",
+  "replace": "                Item.KillAll -> s.copy(peek = PEEK_NONE)"
  },
  {
   "id": "G-GEAR-down",
@@ -298,5 +286,41 @@
   "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
   "find": "val usageOnly = sorted.filter { it.taskId <= 0 }.take(max - withTask.size)",
   "replace": "val usageOnly = sorted.filter { it.taskId <= 0 }.take(max)"
+ },
+ {
+  "id": "G-TOGGLE-closing",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.closing || s.selecting != null) s to emptyList()\n        else s.copy(closing = true",
+  "replace": "if (s.selecting != null) s to emptyList()\n        else s.copy(closing = true"
+ },
+ {
+  "id": "G-TOGGLE-selecting",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.closing || s.selecting != null) s to emptyList()\n        else s.copy(closing = true",
+  "replace": "if (s.closing) s to emptyList()\n        else s.copy(closing = true"
+ },
+ {
+  "id": "G-CENTER-short",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Geometry.kt",
+  "find": "        return viewport / 2f - strip.center(focus)",
+  "replace": "        if (strip.total <= viewport) return (viewport - strip.total) / 2f\n        return viewport / 2f - strip.center(focus)"
+ },
+ {
+  "id": "G-CENTER-ends",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Geometry.kt",
+  "find": "        return viewport / 2f - strip.center(focus)",
+  "replace": "        return (viewport / 2f - strip.center(focus)).coerceIn(viewport - strip.total, 0f)"
+ },
+ {
+  "id": "G-UPMENU-card",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "                else -> s\n            } to emptyList()",
+  "replace": "                else -> s.copy(ctxPkg = \"#x\")\n            } to emptyList()"
+ },
+ {
+  "id": "G-UPMENU-pin",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "CtxOption.CLOSE -> if (item is Item.Pin) {",
+  "replace": "CtxOption.CLOSE -> if (false) {"
  }
 ]

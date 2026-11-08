@@ -31,8 +31,8 @@ sealed interface Item {
     }
 }
 
-/** Long-press menu rows, top to bottom. */
-enum class CtxOption { PIN, EXCEPTION, APP_INFO, SETTINGS }
+/** Long-press menu rows, top to bottom. 1.8: actions on that one app only — Settings left (it has the ⚙), Close came. */
+enum class CtxOption { PIN, EXCEPTION, APP_INFO, CLOSE }
 
 enum class FlyReason { DISMISS, EXCEPTION }
 
@@ -121,6 +121,15 @@ object Overlay {
 
     fun needShizuku(s: OvState) = OvState(scene = Scene.SHIZUKU, showKillAll = s.showKillAll)
 
+    /**
+     * 1.8: the app was launched again while the overlay was on screen — the same remote button (a mapped key, a
+     * tvQuickActions shortcut) pressed a second time. That closes it, as Back would; nothing while it is already
+     * closing or opening an app.
+     */
+    fun relaunched(s: OvState): Pair<OvState, List<Effect>> =
+        if (s.closing || s.selecting != null) s to emptyList()
+        else s.copy(closing = true, pressing = false, ctxPkg = null) to listOf(Effect.Close)
+
     /** Route to Empty when nothing is left; otherwise keep focus on [follow] if it is still there. */
     private fun settle(s: OvState, follow: String?, at: Int = -1): OvState {
         if (s.tasks.isEmpty() && s.pins.isEmpty()) return s.copy(scene = Scene.EMPTY, focus = 0, peek = PEEK_NONE)
@@ -193,7 +202,12 @@ object Overlay {
             Btn.RIGHT -> move(s.copy(peek = PEEK_NONE), -1) to emptyList()     // RTL: toward Kill All
             Btn.LEFT -> move(s.copy(peek = PEEK_NONE), +1) to emptyList()      // toward older apps
             // Kill All ↑ = the ⚙ above it; ⚙ ↓ = back to Kill All
-            Btn.UP -> (if (s.focusedItem == Item.KillAll) s.copy(gear = true, peek = PEEK_NONE) else dismissStep(s, PEEK_UP)) to emptyList()
+            // 1.8: UP on an app opens its menu, as holding OK does (DOWN twice still removes it)
+            Btn.UP -> when (val item = s.focusedItem) {
+                Item.KillAll -> s.copy(gear = true, peek = PEEK_NONE)
+                is Item.Task, is Item.Pin -> s.copy(ctxPkg = item.key, ctxSel = 0, longPress = false, peek = PEEK_NONE)
+                else -> s
+            } to emptyList()
             Btn.DOWN -> (if (s.gearFocused) s.copy(gear = false) else dismissStep(s, PEEK_DOWN)) to emptyList()
             else -> s to emptyList()
         }
@@ -259,7 +273,12 @@ object Overlay {
                     CtxOption.EXCEPTION -> closed.copy(flying = pkg, flyDir = PEEK_UP, flyReason = FlyReason.EXCEPTION) to
                         listOf(Effect.AddException(pkg))
                     CtxOption.APP_INFO -> closed.copy(closing = true) to listOf(Effect.AppInfo(pkg), Effect.Close)
-                    CtxOption.SETTINGS -> closed to listOf(Effect.OpenSettings)
+                    // Close = remove that app, as DOWN twice does: a task flies off; a running pin stays pinned, its task goes
+                    CtxOption.CLOSE -> if (item is Item.Pin) {
+                        val t = s.all.firstOrNull { it.pkg == pkg }
+                        if (t == null) closed to emptyList()
+                        else settle(closed.copy(all = s.all - t), pkg, s.focus) to listOf(Effect.Dismiss(t))
+                    } else closed.copy(flying = pkg, flyDir = PEEK_UP, flyReason = FlyReason.DISMISS) to emptyList()
                 }
             }
             else -> s to emptyList()      // LEFT / RIGHT do nothing while the menu is open (design)

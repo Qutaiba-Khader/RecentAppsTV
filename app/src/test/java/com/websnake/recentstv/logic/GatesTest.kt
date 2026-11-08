@@ -102,9 +102,9 @@ class GatesTest {
         assertEquals(Item.Settings, ready(pins = listOf("p.x")).items.first())
     }
 
-    @Test fun `G-GEAR-up UP from Kill All focuses the gear, from a task it peeks`() {
+    @Test fun `G-GEAR-up UP from Kill All focuses the gear, from a task it opens the menu`() {
         assertTrue(press(ready(a).copy(focus = 0), Btn.UP).first.gearFocused)
-        assertEquals(PEEK_UP, press(ready(a), Btn.UP).first.peek)
+        assertEquals("app.a", press(ready(a), Btn.UP).first.ctxPkg)
     }
 
     @Test fun `G-GEAR-down DOWN from the gear returns to Kill All, from a task it peeks`() {
@@ -151,9 +151,10 @@ class GatesTest {
         assertEquals(PEEK_NONE, press(ready(a, b).copy(killing = true), Btn.DOWN).first.peek)
     }
 
-    @Test fun `G-INPUT-flying no peek during a fly-off`() {
-        assertEquals(PEEK_NONE, press(ready(a, b).copy(flying = "app.b"), Btn.UP).first.peek)
-        assertEquals(PEEK_UP, press(ready(a, b), Btn.UP).first.peek)
+    @Test fun `G-INPUT-flying no peek and no menu during a fly-off`() {
+        assertEquals(PEEK_NONE, press(ready(a, b).copy(flying = "app.b"), Btn.DOWN).first.peek)
+        assertNull(press(ready(a, b).copy(flying = "app.b"), Btn.UP).first.ctxPkg)
+        assertEquals(PEEK_DOWN, press(ready(a, b), Btn.DOWN).first.peek)
     }
 
     @Test fun `G-INPUT-selecting the select zoom swallows every key`() {
@@ -169,7 +170,7 @@ class GatesTest {
     }
 
     @Test fun `G-DISMISS-same only the same direction twice flies the card`() {
-        assertNull(press(press(ready(a), Btn.UP).first, Btn.DOWN).first.flying)
+        assertNull(press(ready(a).copy(peek = PEEK_UP), Btn.DOWN).first.flying)
         assertEquals("app.a", press(press(ready(a), Btn.DOWN).first, Btn.DOWN).first.flying)
     }
 
@@ -221,16 +222,16 @@ class GatesTest {
         assertEquals(TaskSource.STACK_LIST, TaskList.read({ listOf(TaskRef(9, "home")) }, { "taskId=1: a.b/.C\ntaskId=2: c.d/.E" }, { "" }).second)
     }
 
-    // ── G-CLAMP: the row stays on screen ──
-    @Test fun `G-CLAMP-fits a strip that fits is centred whole, whatever the focus`() {
+    // ── G-CENTER: the focused app is always in the middle (1.8) ──
+    @Test fun `G-CENTER-short in a strip that fits, each focus moves the strip`() {
         val l = Geometry.layout(listOf(100f, 100f), 20f, 30f)
-        assertEquals(Geometry.stripOffset(1000f, l, 0), Geometry.stripOffset(1000f, l, 1), 0.001f)
+        assertEquals(500f, Geometry.stripOffset(1000f, l, 1) + l.center(1), 0.001f)
     }
 
-    @Test fun `G-CLAMP-ends the long strip is pinned at both ends`() {
+    @Test fun `G-CENTER-ends the end items of a long strip are centred, not pinned`() {
         val l = Geometry.layout(List(20) { 100f }, 20f, 30f)
-        assertTrue(Geometry.stripOffset(1000f, l, 19) >= 1000f - l.total - 0.001f)
-        assertTrue(Geometry.stripOffset(1000f, l, 0) <= 0.001f)
+        assertEquals(500f, Geometry.stripOffset(1000f, l, 19) + l.center(19), 0.001f)
+        assertEquals(500f, Geometry.stripOffset(1000f, l, 0) + l.center(0), 0.001f)
     }
 
     // the release that ends a hold must not open the app
@@ -278,5 +279,31 @@ class GatesTest {
     @Test fun `G-ROW-room usage-only apps only fill the places tasks leave`() {
         val r = Stored.merge(listOf(Seen("t", 1, 1)), listOf(Seen("u1", -1, 9), Seen("u2", -1, 8)), Ledger(), { false }, max = 2)
         assertEquals(listOf("u1", "t"), r.map { it.pkg })
+    }
+
+    // ── G-TOGGLE: a second launch closes, except mid-close / mid-open ──
+    @Test fun `G-TOGGLE-closing a second launch during the exit fade does nothing`() {
+        val c = ready(a).copy(closing = true)
+        assertTrue(Overlay.relaunched(c).second.isEmpty())
+    }
+
+    @Test fun `G-TOGGLE-selecting a second launch while an app is opening does nothing`() {
+        val s = ready(a).copy(selecting = "app.a")
+        assertTrue(Overlay.relaunched(s).second.isEmpty())
+    }
+
+    // ── G-UPMENU: UP opens the menu only on an app (1.8) ──
+    @Test fun `G-UPMENU-card UP opens the menu on a task or pin, never on the in-row gear`() {
+        assertEquals("app.a", press(ready(a), Btn.UP).first.ctxPkg)
+        assertNull(press(Overlay.loaded(OvState(), listOf(a), emptyList(), false, false).copy(focus = 0), Btn.UP).first.ctxPkg)
+    }
+
+    @Test fun `G-UPMENU-pin Close on a pin keeps it pinned, on a task it flies off`() {
+        var m = press(ready(a, pins = listOf("app.a")).copy(focus = 1), Btn.UP).first
+        repeat(3) { m = press(m, Btn.DOWN).first }
+        assertNull(press(m, Btn.OK).first.flying)
+        var t = press(ready(a), Btn.UP).first
+        repeat(3) { t = press(t, Btn.DOWN).first }
+        assertEquals("app.a", press(t, Btn.OK).first.flying)
     }
 }

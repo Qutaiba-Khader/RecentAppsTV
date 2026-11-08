@@ -131,6 +131,7 @@ val BackdropSwatches = listOf(
 object Motion {
     val standard = androidx.compose.animation.core.CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
     val flyOut = androidx.compose.animation.core.FastOutLinearInEasing
+    val flySmooth = androidx.compose.animation.core.CubicBezierEasing(0.45f, 0f, 0.3f, 1f)   // 1.8: removal fly-off
     const val SCRIM_MS = 320
     const val SCROLL_MS = 340
     const val FOCUS_MS = 260
@@ -150,6 +151,14 @@ object Motion {
     const val KILL_FOCUS_SCALE = 1.10f
     const val IDLE_SCALE = 0.90f
     const val IDLE_ALPHA = 0.80f
+
+    /**
+     * 1.8: moves that follow the remote (←/→ scroll, slots closing a gap, the focus scale, the lift) run on critically
+     * damped springs instead of tweens. A spring keeps its speed when it is retargeted mid-move, so repeated presses
+     * glide instead of stopping and restarting; no bounce, same cost per frame.
+     */
+    fun <T> glide() = androidx.compose.animation.core.spring<T>(dampingRatio = 1f, stiffness = 420f)
+    fun <T> lift() = androidx.compose.animation.core.spring<T>(dampingRatio = 0.86f, stiffness = 520f)
 }
 
 @Composable

@@ -110,14 +110,16 @@ class OverlayTest {
         assertTrue(e.isEmpty()); assertEquals(2, s2.all.size)
     }
 
-    @Test fun `P-OVL-14 UP twice flies the card up`() {
-        val s = press(press(ready(a, b), Btn.UP).first, Btn.UP).first
-        assertEquals("app.a", s.flying); assertEquals(PEEK_UP, s.flyDir)
+    @Test fun `P-OVL-14 UP on an app opens its menu (no hold), on a pin too, peek cleared`() {
+        val s = press(ready(a, b).copy(peek = PEEK_DOWN), Btn.UP).first
+        assertEquals("app.a", s.ctxPkg); assertEquals(0, s.ctxSel); assertFalse(s.longPress); assertEquals(PEEK_NONE, s.peek)
+        assertEquals(listOf(Effect.SetPin("app.a", true)), press(s, Btn.OK).second)     // its first OK runs the row at once
+        assertEquals("p.x", press(ready(a, pins = listOf("p.x")).copy(focus = 2), Btn.UP).first.ctxPkg)
     }
 
-    @Test fun `P-OVL-15 the other direction only moves the peek`() {
-        val s = press(press(ready(a, b), Btn.UP).first, Btn.DOWN).first
-        assertEquals(PEEK_DOWN, s.peek); assertNull(s.flying)
+    @Test fun `P-OVL-15 DOWN then UP - the menu opens instead of a second peek`() {
+        val s = press(press(ready(a, b), Btn.DOWN).first, Btn.UP).first
+        assertEquals(PEEK_NONE, s.peek); assertNull(s.flying); assertEquals("app.a", s.ctxPkg)
     }
 
     @Test fun `P-OVL-16 fly-off landing removes the task, keeps focus in place, then dismisses it`() {
@@ -143,13 +145,13 @@ class OverlayTest {
         assertNull(n.flying); assertTrue(e.isEmpty()); assertEquals(2, n.all.size)
     }
 
-    @Test fun `P-OVL-19 DOWN on Kill All, UP DOWN on the in-row gear or a pin do nothing`() {
+    @Test fun `P-OVL-19 DOWN on Kill All, UP DOWN on the in-row gear, DOWN on a pin do nothing`() {
         val k = ready(a).copy(focus = 0)
         assertEquals(k, press(k, Btn.DOWN).first)
         val g = ready(a, killAll = false).copy(focus = 0)
         assertEquals(g, press(g, Btn.UP).first); assertEquals(g, press(g, Btn.DOWN).first)
         val p = ready(a, pins = listOf("p.x")).copy(focus = 2)
-        assertEquals(p, press(p, Btn.UP).first)
+        assertEquals(p, press(p, Btn.DOWN).first)
     }
 
     @Test fun `P-OVL-20 while a card is flying, keys are ignored`() {
@@ -276,13 +278,25 @@ class OverlayTest {
         assertTrue(Overlay.flyComplete(fp, "p.x").first.pinned.isEmpty())
     }
 
-    @Test fun `P-OVL-36 menu - App info opens it and closes the overlay - Settings opens settings`() {
+    @Test fun `P-OVL-36 menu - App info opens it and closes the overlay - Close flies a task off`() {
         var m = release(menu(ready(a)), Btn.OK).first
         repeat(2) { m = press(m, Btn.DOWN).first }
         val (n, e) = press(m, Btn.OK)
         assertTrue(n.closing); assertEquals(listOf(Effect.AppInfo("app.a"), Effect.Close), e)
         val (s, e2) = press(press(m, Btn.DOWN).first, Btn.OK)
-        assertNull(s.ctxPkg); assertEquals(listOf(Effect.OpenSettings), e2)
+        assertNull(s.ctxPkg); assertTrue(e2.isEmpty())
+        assertEquals("app.a", s.flying); assertEquals(FlyReason.DISMISS, s.flyReason); assertEquals(PEEK_UP, s.flyDir)
+        assertEquals(listOf(Effect.Dismiss(a)), Overlay.flyComplete(s, "app.a").second)
+    }
+
+    @Test fun `P-OVL-54 menu - Close on a running pin removes its task and keeps the pin, on an idle pin does nothing`() {
+        val close = { st: OvState -> var m = press(st, Btn.UP).first; repeat(3) { m = press(m, Btn.DOWN).first }; press(m, Btn.OK) }
+        val (n, e) = close(ready(a, b, pins = listOf("app.b")).copy(focus = 2))                 // focus = pinned, running app.b
+        assertEquals(listOf(Effect.Dismiss(b)), e); assertEquals(listOf("app.b"), n.pinned)
+        assertEquals(listOf(a), n.all); assertNull(n.ctxPkg); assertNull(n.flying)
+        val idle = ready(a, pins = listOf("p.x")).copy(focus = 2)
+        val (i, e2) = close(idle)
+        assertTrue(e2.isEmpty()); assertNull(i.ctxPkg); assertEquals(listOf("p.x"), i.pinned)
     }
 
     @Test fun `P-OVL-37 a menu whose app vanished just closes`() {
@@ -416,5 +430,19 @@ class OverlayTest {
         assertFalse(g.copy(focus = 1).gearFocused)
         assertEquals(Item.Settings, ready(a, killAll = false).items.first())
         assertFalse(ready(a).items.contains(Item.Settings))
+    }
+
+    // 1.8: launching the app again while the overlay shows closes it (the mapped button is a toggle)
+    @Test fun `P-OVL-53 a second launch closes the overlay, menu or not, but not while closing or opening an app`() {
+        val (c, e) = Overlay.relaunched(ready(a, b))
+        assertTrue(c.closing); assertEquals(listOf(Effect.Close), e)
+        val m = Overlay.relaunched(ready(a).copy(ctxPkg = "app.a", pressing = true)).first
+        assertNull(m.ctxPkg); assertFalse(m.pressing); assertTrue(m.closing)
+        val closing = c
+        assertEquals(closing to emptyList<Effect>(), Overlay.relaunched(closing))
+        val sel = ready(a).copy(selecting = "app.a")
+        assertEquals(sel to emptyList<Effect>(), Overlay.relaunched(sel))
+        val gate = Overlay.relaunched(Overlay.needShizuku(ready(a)))
+        assertEquals(listOf(Effect.Close), gate.second)                              // the gate closes too
     }
 }

@@ -156,7 +156,7 @@ fun RecentsOverlay(
     val targetTx = Geometry.stripOffset(viewportW, strip, focusVisual)
     val tx = remember(loadId) { Animatable(targetTx) }
     LaunchedEffect(targetTx, loadId) {
-        if (tx.targetValue != targetTx) tx.animateTo(targetTx, tween(Motion.SCROLL_MS, easing = Motion.standard))
+        if (tx.targetValue != targetTx) tx.animateTo(targetTx, Motion.glide())
     }
 
     // ── header: centred title with the count line under it ──
@@ -166,7 +166,12 @@ fun RecentsOverlay(
     ) {
         Text("Recent apps", style = Type.title, color = Tokens.text)
         val count = SettingsCodec.countLabel(state.tasks.size, state.pins.size)
-        if (count.isNotEmpty()) Text(count, style = Type.small, color = Tokens.textDim, modifier = Modifier.padding(top = 6.dp))
+        // 1.8: with Kill all centred, the ⚙ above it reaches up to this line on a short screen: it steps aside then
+        val countA by animateFloatAsState(if (state.gearFocused) 0f else 1f, tween(160), label = "count")
+        if (count.isNotEmpty()) Text(
+            count, style = Type.small, color = Tokens.textDim,
+            modifier = Modifier.padding(top = 6.dp).graphicsLayer { alpha = countA },
+        )
     }
 
     // ── pinned group frame + its "Pinned" label ──
@@ -194,7 +199,7 @@ fun RecentsOverlay(
             val left = strip.lefts[vi]
             val leftAnim = remember(loadId) { Animatable(left) }
             LaunchedEffect(left) {   // a neighbour was removed or moved: slide over
-                if (leftAnim.targetValue != left) leftAnim.animateTo(left, tween(Motion.FOCUS_MS, easing = Motion.standard))
+                if (leftAnim.targetValue != left) leftAnim.animateTo(left, Motion.glide())
             }
             val item = slot.item
             val focused = item != null && state.scene == Scene.OVERLAY && slot.logical == state.focus && !state.gearFocused
@@ -246,7 +251,7 @@ fun RecentsOverlay(
         val killLeft = strip.lefts[killVisual]
         val gearLeft = remember(loadId) { Animatable(killLeft) }
         LaunchedEffect(killLeft) {
-            if (gearLeft.targetValue != killLeft) gearLeft.animateTo(killLeft, tween(Motion.FOCUS_MS, easing = Motion.standard))
+            if (gearLeft.targetValue != killLeft) gearLeft.animateTo(killLeft, Motion.glide())
         }
         // also out of the way while the "Press again to remove" pill is up: next to Kill all they overlapped (A50)
         val gone = animateFloatAsState(if (state.killing || state.peek != PEEK_NONE) 0f else 1f, tween(200), label = "gearGone")
@@ -286,7 +291,7 @@ fun RecentsOverlay(
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        KeyHint("OK", "Open"); KeyHint("Hold OK", "Options"); KeyHint("↑ ↓", "Twice to remove"); KeyHint("Back", "Close")
+        KeyHint("OK", "Open"); KeyHint("↑ / Hold OK", "Options"); KeyHint("↓ ↓", "Remove"); KeyHint("Back", "Close")
     }
     // 1.7: Shizuku is off (after a TV reboot): the row comes from the last list + usage access. Above the key
     // hints, clear of the ⚙ button (on a short screen it overlapped the header)
@@ -346,8 +351,8 @@ private fun PinnedFrame(
     val density = LocalDensity.current
     val l = remember(loadId) { Animatable(left) }
     val r = remember(loadId) { Animatable(right) }
-    LaunchedEffect(left) { if (l.targetValue != left) l.animateTo(left, tween(Motion.FOCUS_MS, easing = Motion.standard)) }
-    LaunchedEffect(right) { if (r.targetValue != right) r.animateTo(right, tween(Motion.FOCUS_MS, easing = Motion.standard)) }
+    LaunchedEffect(left) { if (l.targetValue != left) l.animateTo(left, Motion.glide()) }
+    LaunchedEffect(right) { if (r.targetValue != right) r.animateTo(right, Motion.glide()) }
     val h = with(density) { (pinDp + GROUP_PAD * 2).toPx() }
     Box(
         Modifier.fillMaxSize().drawBehind {
@@ -421,11 +426,11 @@ private fun AppCard(
     val std = tween<Float>(Motion.FOCUS_MS, easing = Motion.standard)
     val scale = animateFloatAsState(
         when { pressing -> Motion.PRESS_SCALE; focused -> Motion.FOCUS_SCALE; else -> Motion.IDLE_SCALE },
-        if (pressing) tween(Motion.PRESS_MS, easing = Motion.standard) else std, label = "scale",
+        if (pressing) tween(Motion.PRESS_MS, easing = Motion.standard) else Motion.glide(), label = "scale",
     )
-    val focusAmt = animateFloatAsState(if (focused) 1f else 0f, std, label = "focus")
+    val focusAmt = animateFloatAsState(if (focused) 1f else 0f, Motion.glide(), label = "focus")
     val baseAlpha = animateFloatAsState(if (focused) 1f else Motion.IDLE_ALPHA, std, label = "alpha")
-    val peekY = animateFloatAsState(if (peek != PEEK_NONE) peek * with(density) { PEEK.toPx() } else 0f, std, label = "peek")
+    val peekY = animateFloatAsState(if (peek != PEEK_NONE) peek * with(density) { PEEK.toPx() } else 0f, Motion.lift(), label = "peek")
     val fly = remember { Animatable(0f) }
     val flyAlpha = remember { Animatable(1f) }
     val flyPx = with(density) { FLY.toPx() }
@@ -439,8 +444,9 @@ private fun AppCard(
     LaunchedEffect(flying) {
         if (flying) {
             coroutineScope {
-                launch { fly.animateTo(flyDir * flyPx, tween(Motion.FLY_MS, easing = Motion.flyOut)) }
-                launch { flyAlpha.animateTo(0f, tween(Motion.FLY_MS, easing = Motion.flyOut)) }
+                // 1.8: one continuous ease from the lifted spot (no hard start), the fade trailing behind it
+                launch { fly.animateTo(flyDir * flyPx, tween(Motion.FLY_MS, easing = Motion.flySmooth)) }
+                launch { flyAlpha.animateTo(0f, tween(Motion.FLY_MS - 60, delayMillis = 60, easing = Motion.standard)) }
             }
             onFlyComplete()
         }
@@ -616,7 +622,7 @@ private fun PeekHint(peek: Int, cardDp: Dp) {
 private fun KillAllTile(focused: Boolean, cardDp: Dp, cardShape: Shape, killing: Boolean) {
     val accent = LocalAccent.current
     val std = tween<Float>(Motion.FOCUS_MS, easing = Motion.standard)
-    val scale = animateFloatAsState(if (focused) Motion.KILL_FOCUS_SCALE else 1f, std, label = "kscale")
+    val scale = animateFloatAsState(if (focused) Motion.KILL_FOCUS_SCALE else 1f, Motion.glide(), label = "kscale")
     val f = animateFloatAsState(if (focused) 1f else 0f, std, label = "kfocus")
     val gone = animateFloatAsState(if (killing) 0f else 1f, tween(200), label = "kgone")
     val glyph by animateColorAsState(if (focused) accent.onDark else accent.base, tween(Motion.FOCUS_MS), label = "kglyph")
@@ -667,7 +673,7 @@ private fun KillAllTile(focused: Boolean, cardDp: Dp, cardShape: Shape, killing:
 private fun SettingsTile(focused: Boolean, cardDp: Dp, cardShape: Shape) {
     val accent = LocalAccent.current
     val std = tween<Float>(Motion.FOCUS_MS, easing = Motion.standard)
-    val scale = animateFloatAsState(if (focused) Motion.KILL_FOCUS_SCALE else 1f, std, label = "gscale")
+    val scale = animateFloatAsState(if (focused) Motion.KILL_FOCUS_SCALE else 1f, Motion.glide(), label = "gscale")
     val f = animateFloatAsState(if (focused) 1f else 0f, std, label = "gfocus")
     val glyph by animateColorAsState(if (focused) accent.onDark else Tokens.textDim, tween(Motion.FOCUS_MS), label = "gglyph")
     val w = cardDp * SETTINGS_TILE
@@ -711,7 +717,7 @@ private fun SettingsTile(focused: Boolean, cardDp: Dp, cardShape: Shape) {
 private fun SettingsButton(focused: Boolean, width: Dp) {
     val accent = LocalAccent.current
     val std = tween<Float>(Motion.FOCUS_MS, easing = Motion.standard)
-    val scale = animateFloatAsState(if (focused) Motion.KILL_FOCUS_SCALE else 1f, std, label = "pscale")
+    val scale = animateFloatAsState(if (focused) Motion.KILL_FOCUS_SCALE else 1f, Motion.glide(), label = "pscale")
     val f = animateFloatAsState(if (focused) 1f else 0f, std, label = "pfocus")
     val glyph by animateColorAsState(if (focused) accent.onDark else Tokens.textDim, tween(Motion.FOCUS_MS), label = "pglyph")
     val shape = RoundedCornerShape(GEAR_H / 2)

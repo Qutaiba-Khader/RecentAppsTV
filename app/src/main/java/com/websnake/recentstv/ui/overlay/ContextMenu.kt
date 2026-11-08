@@ -51,7 +51,7 @@ private val TIP = 10.dp
 
 /**
  * Long-press OK balloon (screens 05, 06): above the target card with a downward tip.
- * Rows: Pin to row / Unpin · Add to exceptions · App info · Settings. [selected] is
+ * Rows: Pin to row / Unpin · Add to exceptions · App info · Close (1.8). [selected] is
  * driven by the logic (UP/DOWN); OK runs it, BACK closes. Fades and rises in.
  */
 @Composable
@@ -74,7 +74,7 @@ fun ContextMenu(
         (if (isPinned) "Unpin" else "Pin to row") to (if (isPinned) R.drawable.ic_unpin else R.drawable.ic_pin),
         "Add to exceptions" to R.drawable.ic_hide,
         "App info" to R.drawable.ic_info,
-        "Settings" to R.drawable.ic_settings,
+        "Close" to R.drawable.ic_trash,
     )
     val fade = Modifier.graphicsLayer {
         alpha = shown

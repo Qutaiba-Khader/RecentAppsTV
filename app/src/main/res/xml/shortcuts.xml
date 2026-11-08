@@ -10,6 +10,5 @@
             android:action="com.websnake.recentstv.OPEN_RECENTS"
             android:targetPackage="com.websnake.recentstv"
             android:targetClass="com.websnake.recentstv.RecentsActivity" />
-        <categories android:name="android.shortcut.conversation" />
     </shortcut>
 </shortcuts>

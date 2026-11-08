@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.8 — 2026-11-09
+
+- The button that opens the list closes it when pressed again: a second launch while the overlay shows closes it
+  (`onNewIntent` → `Overlay.relaunched`). No key remapping in the app.
+- "Open Recent Apps" in button mappers' Shortcuts lists (`ShortcutActivity`, `ACTION_CREATE_SHORTCUT`) — the list
+  tvQuickActions builds with `queryIntentActivities(CREATE_SHORTCUT)`.
+- ↑ on an app opens its menu; ↓ ↓ still removes. Menu: Pin · Exceptions · App info · Close (Settings removed; Close
+  removes the app, a running pin keeps its pin).
+- The focused app is always centred (no more pinned row ends).
+- Springs (critically damped) for ←/→ scroll, slot moves, focus scale and the card lift; smoother fly-off easing.
+  A50 frames: 53–58 % slow vs 58–72 % before, median 17–19 ms vs 19–22 ms.
+- The ⚙ fades the "N apps" line while focused (they met on a short screen); dropped the wrong
+  `android.shortcut.conversation` category from the launcher shortcut.
+
 ## 1.7 — 2026-11-09
 
 - The row reads every task the system stores (`dumpsys activity recents` through Shizuku), not only the "visible" few:

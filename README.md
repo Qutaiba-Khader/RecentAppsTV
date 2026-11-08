@@ -16,16 +16,16 @@ backup when Shizuku isn't running.
 <td><img src="docs/screenshots/pinned.jpg" alt="Pinned apps"><br><sub><b>Pinned apps</b> — always in the row, running or not</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/menu.jpg" alt="Hold OK menu"><br><sub><b>Hold OK</b> — pin, hide, app info, settings</sub></td>
-<td><img src="docs/screenshots/dismiss-peek.jpg" alt="Remove one app"><br><sub><b>↑ or ↓ twice</b> — the card steps aside, the second press sends it off</sub></td>
+<td><img src="docs/screenshots/menu.jpg" alt="Hold OK menu"><br><sub><b>↑ or Hold OK</b> — pin, hide, app info, close (design; 1.8 replaces Settings with Close)</sub></td>
+<td><img src="docs/screenshots/dismiss-peek.jpg" alt="Remove one app"><br><sub><b>↓ twice</b> — the card steps aside, the second press sends it off</sub></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/kill-all.jpg" alt="Kill all focused"><br><sub><b>Kill all</b> — clears running apps; pins stay</sub></td>
-<td><img src="docs/screenshots/settings-button.jpg" alt="Settings button above Kill all"><br><sub><b>↑ on Kill all</b> — the ⚙ Settings button above it (on a device)</sub></td>
+<td><img src="docs/screenshots/settings-button.jpg" alt="Settings button above Kill all"><br><sub><b>↑ on Kill all</b> — the ⚙ Settings button above it; the focused tile is always centred (on a device)</sub></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/empty-with-pins.jpg" alt="Only pins"><br><sub><b>Nothing running</b> — your pins are still one press away</sub></td>
-<td><img src="docs/screenshots/menu-device.jpg" alt="Hold OK menu on a device"><br><sub><b>Hold OK</b> on a device — the balloon stays open until you choose</sub></td>
+<td><img src="docs/screenshots/menu-device.jpg" alt="Hold OK menu on a device"><br><sub><b>↑ or Hold OK</b> on a device — the balloon stays open until you choose</sub></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/settings.jpg" alt="Settings"><br><sub><b>Settings</b> — overlay, pinned apps, background, hidden apps</sub></td>
@@ -47,12 +47,13 @@ backup when Shizuku isn't running.
 
 | Key | In the list |
 |---|---|
-| **← / →** | move between apps (→ goes toward newer apps and **Kill all**) |
+| **← / →** | move between apps (→ goes toward newer apps and **Kill all**) — the focused app always sits in the middle of the screen |
 | **↑** on **Kill all** | the **⚙ Settings** button above it (**↓** back to Kill all, **←** on to the apps) |
 | **OK** | open that app · on **Kill all**: clear running apps (pins stay) · on **⚙ Settings**: open Settings |
-| **Hold OK** (about half a second) | a balloon menu above the app: *Pin to row / Unpin* · *Add to exceptions* · *App info* · *Settings* — it stays open after you let go; **↑ / ↓** pick, **OK** runs, **Back** closes |
-| **↑ ↑** or **↓ ↓** | remove that app (first press lifts the card with a hint, second press sends it off) — pinned apps can't be removed this way |
+| **↑** or **Hold OK** (about half a second) | a balloon menu above the app: *Pin to row / Unpin* · *Add to exceptions* · *App info* · *Close* — it stays open after you let go; **↑ / ↓** pick, **OK** runs, **Back** closes |
+| **↓ ↓** | remove that app (first press moves the card down with a hint, second press sends it off) — pinned apps can't be removed this way; *Close* in the menu does the same, also for a running pinned app (it stays pinned) |
 | **Back** | close the menu, or close the list (the app underneath carries on) |
+| **the button that opened it** | press it again to close the list (a toggle) — no key remapping inside the app |
 | **Menu** | settings (remotes that have the key) |
 
 When *Kill all* isn't shown (nothing running, or turned off in Settings), the ⚙ button takes its place at the right end
@@ -62,6 +63,20 @@ In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The scree
 position* and the colour swatches read left-to-right (→ means Right). On *Pinned apps* and *Exceptions*, **↑** from the
 first row reaches the *Unpin all* / *Hide all* / *Show all* buttons. On *Background image*, **↑** from the pictures
 reaches the picker apps (Gallery, Files…).
+
+## What's new in 1.8
+
+- **One button opens and closes it.** Press the button you mapped (tvQuickActions, Button Mapper…) to open the list and
+  press it again to close it. The app remaps no keys: a second launch while the list is on screen simply closes it — from
+  a mapped app launch, the launcher, the `OPEN_RECENTS` action or a shortcut.
+- **"Open Recent Apps" in the Shortcuts list** of button mappers (the standard shortcut picker, `CREATE_SHORTCUT`) — in
+  tvQuickActions: *Shortcuts → Recent Apps → Open Recent Apps*.
+- **↑ on an app opens its menu** (as holding OK does); **↓ ↓** still removes it.
+- **The menu is about that app only:** *Pin to row* · *Add to exceptions* · *App info* · **Close** (removes it — force-stop and
+  its tasks, as ↓ ↓). Settings has its own ⚙ button above Kill all.
+- **The focused app is always in the middle of the screen**, at both ends of the row too.
+- **Smoother motion:** moving ←/→ and the card moving down / flying off run on springs that keep their speed when you
+  press again mid-move, so quick presses glide. Measured on the A50: no extra cost per frame (slightly fewer slow frames).
 
 ## What's new in 1.7
 
@@ -179,14 +194,14 @@ obtainium://app/%7B%22id%22%3A%22com.websnake.recentstv%22%2C%22url%22%3A%22http
 2. Install **Recent Apps TV**: with ObtainX / Obtainium (above), or the APK from [Releases](../../releases).
 3. Open it once and choose **Open Shizuku & grant** → *Allow*. That is the only question; usage access is granted
    automatically through Shizuku.
-4. Map a remote button to it (with a button-remapper app), using:
+4. Map a remote button to it (with a button-remapper app) — pick the shortcut **Open Recent Apps**, or launch the app / activity:
 
 ```
 com.websnake.recentstv/.RecentsActivity        (or the action com.websnake.recentstv.OPEN_RECENTS)
 ```
 
-It also appears as a normal app in the launcher, and publishes a launcher shortcut. There is deliberately no
-"how to open" option inside the app. Settings: **↑** on *Kill all* → ⚙ *Settings*, hold OK → *Settings*, the **Menu** key, or `com.websnake.recentstv/.SettingsActivity`.
+Pressing the same button again closes the list. It also appears as a normal app in the launcher, and publishes a launcher shortcut. There is deliberately no
+"how to open" option inside the app. Settings: **↑** on *Kill all* → ⚙ *Settings*, the **Menu** key, or `com.websnake.recentstv/.SettingsActivity`.
 
 Upgrading from 1.0 keeps your settings. Reinstalling may ask for the Shizuku permission again.
 
@@ -229,8 +244,8 @@ Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every c
 ## Tests — the flow map
 
 The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
-fails the build on any line or branch that no test runs. 170 tests, 100 % of lines and branches; the critical conditions
-are mutation-tested (each one is removed in a copy and a test must fail: 50 of 50 caught).
+fails the build on any line or branch that no test runs. 176 tests, 100 % of lines and branches; the critical conditions
+are mutation-tested (each one is removed in a copy and a test must fail: 54 of 54 caught).
 
 Remote input is tested on a real device as well, with `tools/perf/rkey` — a tiny virtual remote (uinput, root) that
 holds keys the way a TV remote does, so Android sends its own key repeats. (`adb shell input keyevent --longpress` sends

@@ -20,9 +20,10 @@ class GeometryTest {
         assertEquals(60f, l.total, eps); assertEquals(30f, l.center(3), eps)
     }
 
-    @Test fun `P-GEO-03 a strip that fits is centred as a whole`() {
+    @Test fun `P-GEO-03 a short strip still puts the focused item in the middle`() {
         val l = Geometry.layout(listOf(100f, 100f), 20f, 30f)       // total 280
-        assertEquals((1000f - 280f) / 2f, Geometry.stripOffset(1000f, l, 0), eps)
+        assertEquals(500f - l.center(0), Geometry.stripOffset(1000f, l, 0), eps)
+        assertEquals(500f - l.center(1), Geometry.stripOffset(1000f, l, 1), eps)
     }
 
     @Test fun `P-GEO-04 a long strip centres the focused item`() {
@@ -30,10 +31,10 @@ class GeometryTest {
         assertEquals(500f - l.center(10), Geometry.stripOffset(1000f, l, 10), eps)
     }
 
-    @Test fun `P-GEO-05 clamp - Kill All on the right never leaves the screen, nor the oldest on the left`() {
+    @Test fun `P-GEO-05 the end items are centred too - empty space beside the row instead of a pinned end`() {
         val l = Geometry.layout(List(20) { 100f }, 20f, 30f)
-        assertEquals(1000f - l.total, Geometry.stripOffset(1000f, l, 19), eps)    // right end pinned
-        assertEquals(0f, Geometry.stripOffset(1000f, l, 0), eps)                  // left end pinned
+        assertEquals(500f - l.center(19), Geometry.stripOffset(1000f, l, 19), eps)
+        assertEquals(500f - l.center(0), Geometry.stripOffset(1000f, l, 0), eps)
     }
 
     @Test fun `P-GEO-06 no viewport yet means no offset`() {

@@ -40,14 +40,12 @@ object Geometry {
         }
 
     /**
-     * Strip translation that centres item [focus] in a [viewport]-wide window.
-     * A strip that fits is centred as a whole; a longer one is clamped so neither
-     * end (Kill All on the right) ever leaves the screen.
+     * Strip translation that puts item [focus] in the middle of a [viewport]-wide window — always, at either end of
+     * the row and in a short row too (1.8, owner: the focused app sits in the centre; empty space beside the row is fine).
      */
     fun stripOffset(viewport: Float, strip: StripLayout, focus: Int): Float {
         if (viewport <= 0f) return 0f
-        if (strip.total <= viewport) return (viewport - strip.total) / 2f
-        return (viewport / 2f - strip.center(focus)).coerceIn(viewport - strip.total, 0f)
+        return viewport / 2f - strip.center(focus)
     }
 
     /**
