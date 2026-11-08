@@ -27,6 +27,13 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.6 (same A50, 2026-11-08): an app_process probe run as shell (uid 2000) on the A50 and, read-only, on the TV showed
+getRecentTasks works for shell (TV 6 = same apps as the root tasks, other order; A50 21 vs 3), moveTaskToFront with a
+null package throws for shell, startActivityFromRecents works (2 = brought to front, 0 = relaunched a killed task). The
+app then ran with Shizuku in shell mode: src=RECENTS (raw read 10–95 ms), OK → startActivityFromRecents=2 / =0, ↑ ↑ →
+removeTask=true, Kill all → 12 × removeTask=true, Settings app listed and opened, hold menu and ⚙ still fine; root mode
+re-checked (switch =2).
+
 1.5 (same A50, 2026-11-08, `rkey`, on the released APK): → to Kill all, ↑ → Settings button focused, OK → Settings,
 Back → list; ↑ ↓ → Kill all again, OK clears; ↑ ← → newest app, OK opens it; hold OK 1.5 s → balloon, nothing pinned;
 pins only (no Kill all) → ⚙ at the right end of the row, → OK → Settings. README screenshots `settings-button.jpg` and

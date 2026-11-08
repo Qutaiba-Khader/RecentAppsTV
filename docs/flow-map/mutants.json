@@ -244,5 +244,11 @@
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
   "find": "gear && scene == Scene.OVERLAY && hasKillAll && itemAt(focus) == Item.KillAll",
   "replace": "gear && scene == Scene.OVERLAY && hasKillAll"
+ },
+ {
+  "id": "G-READ-recents",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/TaskList.kt",
+  "find": "if (!r.isNullOrEmpty()) return r to TaskSource.RECENTS",
+  "replace": "if (r != null) return r to TaskSource.RECENTS"
  }
 ]

@@ -212,6 +212,11 @@ class GatesTest {
         assertEquals(TaskSource.STACK_LIST, TaskList.read({ null }, { "taskId=1: a.b/.C\ntaskId=2: c.d/.E" }, { "" }).second)
     }
 
+    @Test fun `G-READ-recents a non-empty system recents list is used, an empty one is not`() {
+        assertEquals(TaskSource.RECENTS, TaskList.read({ listOf(TaskRef(1, "a"), TaskRef(2, "b")) }, { "" }, { "" }, recents = { listOf(TaskRef(5, "x")) }).second)
+        assertEquals(TaskSource.BINDER, TaskList.read({ listOf(TaskRef(1, "a"), TaskRef(2, "b")) }, { "" }, { "" }, recents = { emptyList() }).second)
+    }
+
     @Test fun `G-READ-size a one-task binder list is not enough`() {
         assertEquals(TaskSource.STACK_LIST, TaskList.read({ listOf(TaskRef(9, "home")) }, { "taskId=1: a.b/.C\ntaskId=2: c.d/.E" }, { "" }).second)
     }

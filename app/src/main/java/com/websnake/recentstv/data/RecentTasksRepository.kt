@@ -23,15 +23,19 @@ import java.lang.reflect.Method
  * Reads and changes the system task list through Shizuku, behind one interface so
  * the UI never touches Shizuku directly.
  *
- *  - read    : root-task infos over the binder (what `am stack list` prints, without
- *              spawning a process) → `am stack list` → `dumpsys activity recents`
- *  - switch  : IActivityTaskManager.moveTaskToFront → monkey launch (caller adds intent fallback)
+ * The calls are the ones Android's own recents screen makes (SystemUI / Launcher3 through
+ * ActivityManagerWrapper and the WM Shell RecentTasksController):
+ *  - read    : IActivityTaskManager.getRecentTasks(max, RECENT_IGNORE_UNAVAILABLE, user) — the
+ *              system's visible recents, most recent first (shell holds REAL_GET_TASKS) → root-task
+ *              infos over the binder → `am stack list` → `dumpsys activity recents`
+ *  - switch  : startActivityFromRecents(taskId) (START_TASKS_FROM_RECENTS; also brings back a task
+ *              whose app was killed) → moveTaskToFront → monkey (caller adds the intent fallback)
  *  - dismiss : force-stop (optional) + removeTask for every task of the package
- *  - killAll : the same for every shown package
+ *  - killAll : the same for every shown package (not removeAllVisibleRecentTasks: that would also
+ *              clear the apps hidden with Exceptions)
  *
- * Note: as the Shizuku *shell* identity the privileged getRecentTasks returns only the
- * caller's own task (shell lacks REAL_GET_TASKS); root-task infos need only
- * MANAGE_ACTIVITY_TASKS, which shell holds.
+ * Found 2026-11-08: with Shizuku as shell (the TV), moveTaskToFront(null package) throws
+ * "package=null does not belong to uid=2000", so 1.0–1.5 always fell back to a monkey launch there.
  */
 class RecentTasksRepository(private val context: Context) {
 
@@ -41,7 +45,11 @@ class RecentTasksRepository(private val context: Context) {
     private val homePackages: Set<String> by lazy {
         runCatching {
             val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-            context.packageManager.queryIntentActivities(intent, 0).mapTo(HashSet()) { it.activityInfo.packageName }
+            // real launchers only: the system Settings app registers a FallbackHome at priority -1000
+            // (com.android.settings, com.android.tv.settings) and must still show as a recent app
+            context.packageManager.queryIntentActivities(intent, 0)
+                .filter { it.priority >= 0 }
+                .mapTo(HashSet()) { it.activityInfo.packageName }
         }.getOrDefault(emptySet())
     }
 
@@ -52,6 +60,7 @@ class RecentTasksRepository(private val context: Context) {
         if (!ready()) return emptyList<TaskRef>() to TaskSource.NONE
         homePackages        // resolve the launcher set here, in parallel with the settings read
         return TaskList.read(
+            recents = { runCatching { readRecents() }.getOrNull() },
             binder = { runCatching { readViaBinder() }.getOrNull() },
             stackList = { execShell("am stack list") },
             dumpsys = { execShell("dumpsys activity recents") },
@@ -79,6 +88,24 @@ class RecentTasksRepository(private val context: Context) {
     }
 
     // ── binder read ──────────────────────────────────────────────────────
+    private val userId get() = android.os.Process.myUid() / 100_000     // UserHandle.getUserId
+
+    /** The system's recents list, most recent first: (taskId, package of the task's base intent). */
+    private fun readRecents(): List<TaskRef>? {
+        val atm = activityTaskManager() ?: return null
+        val m = atm.javaClass.getMethod("getRecentTasks", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+        val slice = m.invoke(atm, RECENTS_MAX, RECENT_IGNORE_UNAVAILABLE, userId) ?: return null
+        val list = slice.javaClass.getMethod("getList").invoke(slice) as? List<*> ?: return null
+        return list.filterNotNull().mapNotNull { info ->
+            // TaskInfo.taskId (Android 10+), RecentTaskInfo.persistentId before that
+            val id = (readField(info, "taskId") ?: readField(info, "persistentId")) as? Int ?: return@mapNotNull null
+            val cmp = (readField(info, "baseIntent") as? Intent)?.component
+                ?: readField(info, "realActivity") as? android.content.ComponentName
+                ?: readField(info, "baseActivity") as? android.content.ComponentName
+            cmp?.packageName?.let { TaskRef(id, it) }
+        }
+    }
+
     private var rootTasksMethod: Method? = null
 
     private fun readViaBinder(): List<TaskRef>? {
@@ -99,11 +126,21 @@ class RecentTasksRepository(private val context: Context) {
     }
 
     // ── actions ──────────────────────────────────────────────────────────
-    /** Bring an existing task to the front. False → caller launches via intent. */
+    /** Bring a recent task back. False → caller launches via intent. */
     fun switchTo(pkg: String, taskId: Int): Boolean {
         if (!ready()) return false
-        // moveTaskToFront(IApplicationThread, String, int taskId, int flags, Bundle) — signatures
-        // vary across ROMs: taskId goes in the first int slot, 0/null everywhere else.
+        // what the system recents screen does: also restarts a task whose app was killed
+        val fromRecents = runCatching {
+            val atm = activityTaskManager() ?: return@runCatching false
+            val r = atm.javaClass.getMethod("startActivityFromRecents", Int::class.javaPrimitiveType, android.os.Bundle::class.java)
+                .invoke(atm, taskId, null) as? Int
+            Log.i(TAG, "startActivityFromRecents($taskId)=$r")
+            r != null && r in 0..99          // ActivityManager.isStartResultSuccessful
+        }.getOrElse { Log.w(TAG, "startActivityFromRecents($taskId) failed: ${it.cause ?: it}"); false }
+        if (fromRecents) return true
+        // moveTaskToFront(IApplicationThread, String callingPackage, int taskId, int flags, Bundle) —
+        // signatures vary across ROMs: taskId in the first int slot, the caller's package (the shell
+        // identity Shizuku runs as; any package passes as root) in the String slot, 0/null elsewhere.
         val moved = runCatching {
             val atm = activityTaskManager() ?: return@runCatching false
             val m = atm.javaClass.methods.firstOrNull {
@@ -112,11 +149,12 @@ class RecentTasksRepository(private val context: Context) {
             var firstInt = true
             val args = m.parameterTypes.map { p ->
                 if (p == Int::class.javaPrimitiveType) (if (firstInt) taskId else 0).also { firstInt = false }
+                else if (p == String::class.java) SHELL_PKG
                 else nullFor(p)
             }.toTypedArray()
             m.invoke(atm, *args)
             true
-        }.getOrDefault(false)
+        }.getOrElse { Log.w(TAG, "moveTaskToFront($taskId) failed: ${it.cause ?: it}"); false }
         if (moved) return true
         return execShell("monkey -p $pkg -c android.intent.category.LEANBACK_LAUNCHER 1")
             .contains("Events injected")
@@ -154,10 +192,10 @@ class RecentTasksRepository(private val context: Context) {
         runCatching {
             activityManager()?.let { iam ->
                 iam.javaClass.getMethod("forceStopPackage", String::class.java, Int::class.javaPrimitiveType)
-                    .invoke(iam, pkg, 0)
+                    .invoke(iam, pkg, userId)
             }
         }
-        execShell("am force-stop $pkg")
+        execShell("am force-stop --user $userId $pkg")
     }
 
     // ── privileged binder handles (cached per process) ───────────────────
@@ -206,6 +244,9 @@ class RecentTasksRepository(private val context: Context) {
 
     companion object {
         const val TAG = "RTV"
+        private const val RECENTS_MAX = 30       // the row shows 12; room for skipped and hidden apps
+        private const val RECENT_IGNORE_UNAVAILABLE = 0x0002      // ActivityManager.RECENT_IGNORE_UNAVAILABLE
+        private const val SHELL_PKG = "com.android.shell"
         // The binder proxy dies with Shizuku; dropped when its binder dies (see ShizukuManager).
         @Volatile private var atm: Any? = null
         fun dropBinders() { atm = null }

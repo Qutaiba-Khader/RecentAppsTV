@@ -10,7 +10,7 @@ python3 tools/flow/flowmap.py update    # mechanical update: line numbers, skele
 ```
 
 <!-- TOTALS:START -->
-**Last clean pass 2026-11-08 19:48:40 +0300:** 105 paths, 41 gate tests · lines 413/413 (100.0%) · branches 471/471 (100.0%) · 0 justified, 0 unjustified.
+**Last clean pass 2026-11-08 20:11:02 +0300:** 108 paths, 42 gate tests · lines 417/417 (100.0%) · branches 477/477 (100.0%) · 0 justified, 0 unjustified.
 <!-- TOTALS:END -->
 
 ## Areas
@@ -63,7 +63,7 @@ outcome changes. Tests are named `G-<GATE>-<condition>`; `flow-map/mutants.json`
 | G-GEAR | OvState.gearFocused / overlayKey / move | UP on Kill All · DOWN on the ⚙ · RIGHT on the ⚙ stays · counts only with the flag, in the overlay, with Kill All shown and focused | the ⚙ Settings button above Kill All is reached and left with the D-pad |
 | G-ROW | OvState.items / Overlay.settle | the ⚙ is in the row (first) only when Kill All isn't shown · pinned running app leaves the tasks · Kill All needs the setting and a task · Empty needs no tasks and no pins | who sits in the row |
 | G-SELECT | TaskList.select | taskId > 0 · package not blank · first of its package · not excluded | which apps the user sees |
-| G-READ | TaskList.read | binder result present · at least two tasks | which source the list is trusted from |
+| G-READ | TaskList.read | the system recents list (getRecentTasks) is non-empty · else: binder root tasks present · at least two tasks | which source the list is trusted from |
 | G-CLAMP | Geometry.stripOffset | strip fits · clamp at both ends | Kill All never leaves the screen |
 
 ## The update rule

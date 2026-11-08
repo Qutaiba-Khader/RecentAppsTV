@@ -4,7 +4,7 @@ package com.websnake.recentstv.logic
 data class TaskRef(val taskId: Int, val pkg: String)
 
 /** Where a task list came from (logged, so a slow device can be diagnosed). */
-enum class TaskSource { BINDER, STACK_LIST, DUMPSYS, NONE }
+enum class TaskSource { RECENTS, BINDER, STACK_LIST, DUMPSYS, NONE }
 
 object TaskList {
     const val MAX_TASKS = 12
@@ -50,15 +50,20 @@ object TaskList {
     }
 
     /**
-     * Pick the source: binder first (no process spawn), then `am stack list`, then the
-     * heavier dumpsys. A list of fewer than two tasks is only the launcher, so the next
-     * source is tried. Each source is only read when the one before falls short.
+     * Pick the source. First the system's own recents list ([recents]: getRecentTasks, most
+     * recent first, as SystemUI / Launcher3 read it — the launcher is never in it, so one app is
+     * enough). Then the root tasks over the binder (no process spawn), then `am stack list`,
+     * then the heavier dumpsys; for those a list of fewer than two tasks is only the launcher,
+     * so the next source is tried. Each source is only read when the one before falls short.
      */
     fun read(
         binder: () -> List<TaskRef>?,
         stackList: () -> String,
         dumpsys: () -> String,
+        recents: () -> List<TaskRef>? = { null },
     ): Pair<List<TaskRef>, TaskSource> {
+        val r = recents()
+        if (!r.isNullOrEmpty()) return r to TaskSource.RECENTS
         val b = binder()
         if (b != null && b.size >= 2) return b to TaskSource.BINDER
         val s = parseStackList(stackList())

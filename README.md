@@ -62,6 +62,19 @@ position* and the colour swatches read left-to-right (→ means Right). On *Pinn
 first row reaches the *Unpin all* / *Hide all* / *Show all* buttons. On *Background image*, **↑** from the pictures
 reaches the picker apps (Gallery, Files…).
 
+## What's new in 1.6
+
+Checked against how Android's own recents screen does it (SystemUI / Launcher3 / WM Shell in AOSP) and tested on the
+A50 with Shizuku in shell mode, the way it runs on the TV:
+
+- **The list is the system's own recents list** (`getRecentTasks`, most recent first), not the windows that happen to be
+  open. On the TV both hold the same apps but in a different order; on a phone the open windows were 3 of 21.
+- **Opening an app works the system way on the TV.** With Shizuku as shell, `moveTaskToFront` was refused
+  ("package=null does not belong to uid=2000"), so 1.0–1.5 always fell back to relaunching the app there. Now it uses
+  `startActivityFromRecents`, like the recents screen — it also brings back an app the system had closed.
+- **The system Settings app shows up.** It registers a fallback home screen, so it was taken for a launcher and hidden.
+- Force-stop now targets the current user instead of user 0.
+
 ## What's new in 1.5
 
 - **⚙ Settings now sits above Kill all.** Go to *Kill all* (→), press **↑** to reach *Settings*, **OK** opens it;
@@ -164,12 +177,12 @@ Upgrading from 1.0 keeps your settings. Reinstalling may ask for the Shizuku per
 ## How it works
 
 All privileged work sits in `RecentTasksRepository`, through the Shizuku shell identity
-(`MANAGE_ACTIVITY_TASKS`, `REMOVE_TASKS`, `FORCE_STOP_PACKAGES`):
+(`REAL_GET_TASKS`, `START_TASKS_FROM_RECENTS`, `MANAGE_ACTIVITY_TASKS`, `REMOVE_TASKS`, `FORCE_STOP_PACKAGES` — all held by shell):
 
 | Action | How |
 |---|---|
-| read | the root-task list over the binder (`getAllRootTaskInfos`, or `getAllStackInfos` on Android 10–11) — the same data `am stack list` prints, without starting a process; falls back to `am stack list`, then `dumpsys activity recents` |
-| switch | after the select zoom: `IActivityTaskManager.moveTaskToFront`, else the app's launch intent (a pinned app that isn't running) |
+| read | the system recents list: `IActivityTaskManager.getRecentTasks(max, RECENT_IGNORE_UNAVAILABLE, user)` (shell holds `REAL_GET_TASKS`), most recent first — what SystemUI / Launcher3 read; falls back to the root tasks over the binder, then `am stack list`, then `dumpsys activity recents` |
+| switch | after the select zoom: `startActivityFromRecents(taskId)` (as the recents screen; `START_TASKS_FROM_RECENTS`), else `moveTaskToFront`, else the app's launch intent (a pinned app that isn't running) |
 | remove | force-stop (optional), then `removeTask` for **every** task of that app |
 | kill all | the same for every running app shown (pins included); the pins stay in the row |
 
@@ -193,8 +206,8 @@ Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every c
 ## Tests — the flow map
 
 The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
-fails the build on any line or branch that no test runs. 143 tests, 100 % of lines and branches; the critical conditions
-are mutation-tested (each one is removed in a copy and a test must fail: 41 of 41 caught).
+fails the build on any line or branch that no test runs. 150 tests, 100 % of lines and branches; the critical conditions
+are mutation-tested (each one is removed in a copy and a test must fail: 42 of 42 caught).
 
 Remote input is tested on a real device as well, with `tools/perf/rkey` — a tiny virtual remote (uinput, root) that
 holds keys the way a TV remote does, so Android sends its own key repeats. (`adb shell input keyevent --longpress` sends

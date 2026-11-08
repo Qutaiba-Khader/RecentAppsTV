@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6 — 2026-11-08
+- Data methods checked against AOSP (SystemUI ActivityManagerWrapper, WM Shell RecentTasksController, Launcher3) and on the
+  A50 with Shizuku in shell mode (as on the TV):
+  - read: `getRecentTasks(max, RECENT_IGNORE_UNAVAILABLE, user)` first (system recents, most recent first); root tasks,
+    `am stack list`, dumpsys stay as fallbacks. The old note "shell lacks REAL_GET_TASKS" was wrong.
+  - switch: `startActivityFromRecents` first. Fixed: as shell, `moveTaskToFront(null package)` threw
+    "package=null does not belong to uid=2000", so every switch on the TV fell back to a monkey relaunch; the fallback
+    now passes `com.android.shell`.
+  - Fixed: the system Settings app (FallbackHome, priority -1000) was taken for a launcher and never shown.
+  - force-stop uses the current user (was user 0). removeTask + force-stop for dismiss / Kill all were already right.
+- Tests: 150, 100 % lines and branches, 42 of 42 gate mutants caught.
+
 ## 1.5 — 2026-11-08
 - The ⚙ Settings button moved above Kill all: ↑ on Kill all focuses it, OK opens Settings, ↓ returns, ← goes on to the
   apps. Without Kill all on screen it stays at the right end of the row.

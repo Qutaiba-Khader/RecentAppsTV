@@ -121,4 +121,22 @@ class TaskListTest {
         assertEquals(listOf(TaskRef(1, "a")) to TaskSource.BINDER, TaskList.read({ listOf(TaskRef(1, "a")) }, { one }, { "" }))
         assertEquals(emptyList<TaskRef>() to TaskSource.NONE, TaskList.read({ emptyList() }, { "" }, { "" }))
     }
+
+    // 1.6: the system recents list (getRecentTasks) is read first, as SystemUI / Launcher3 read it
+    @Test fun `P-TASK-15 the system recents list wins, in its order, and nothing else is read`() {
+        val r = listOf(TaskRef(7, "app.newest"), TaskRef(3, "app.older"))
+        val (t, src) = TaskList.read({ error("root tasks must not be read") }, { error("no stack list") }, { error("no dumpsys") }, recents = { r })
+        assertEquals(TaskSource.RECENTS, src); assertEquals(r, t)
+    }
+
+    @Test fun `P-TASK-16 one app in the recents list is enough (the launcher is never in it)`() {
+        assertEquals(listOf(TaskRef(4, "only")) to TaskSource.RECENTS,
+            TaskList.read({ error("no root tasks") }, { "" }, { "" }, recents = { listOf(TaskRef(4, "only")) }))
+    }
+
+    @Test fun `P-TASK-17 a failed or empty recents read falls back to the root tasks`() {
+        val roots = listOf(TaskRef(1, "a"), TaskRef(2, "b"))
+        assertEquals(TaskSource.BINDER, TaskList.read({ roots }, { "" }, { "" }, recents = { null }).second)
+        assertEquals(TaskSource.BINDER, TaskList.read({ roots }, { "" }, { "" }, recents = { emptyList() }).second)
+    }
 }

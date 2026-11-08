@@ -21,6 +21,9 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 | P-TASK-12 | TaskList.read | home detection by resolved launchers and known launcher prefixes | home detection by resolved launchers and known launcher prefixes | TaskListTest.kt asserts state + effects | TaskList.kt — the parser regex or the source order in `read()` |
 | P-TASK-13 | TaskList.read | dumpsys | an id too large for Int becomes -1 | TaskListTest.kt asserts state + effects | TaskList.kt — the parser regex or the source order in `read()` |
 | P-TASK-14 | TaskList.read | all short | the longer list wins, binder on a tie, empty binder loses to stack | TaskListTest.kt asserts state + effects | TaskList.kt — the parser regex or the source order in `read()` |
+| P-TASK-15 | TaskList.read | the system recents list is non-empty | it wins, in its order, and nothing else is read | TaskListTest.kt asserts state + effects | TaskList.kt — `read()`: the recents source is tried first |
+| P-TASK-16 | TaskList.read | recents holds one app | one app is enough (the launcher is never in it) | TaskListTest.kt asserts state + effects | TaskList.kt — `read()`: the recents source is tried first |
+| P-TASK-17 | TaskList.read | recents read failed (null) or empty | falls back to the root tasks | TaskListTest.kt asserts state + effects | TaskList.kt — `read()`: the recents source is tried first |
 
 ## Mode combinations
 
