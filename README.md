@@ -51,7 +51,21 @@ The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root
 
 In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The screen reads right-to-left as in the design; *Pinned
 position* and the colour swatches read left-to-right (→ means Right). On *Pinned apps* and *Exceptions*, **↑** from the
-first row reaches the *Unpin all* / *Hide all* / *Show all* buttons.
+first row reaches the *Unpin all* / *Hide all* / *Show all* buttons. On *Background image*, **↑** from the pictures
+reaches the picker apps (Gallery, Files…).
+
+## What's new in 1.3
+
+- **Choosing a background picture now works on a TV.** Android TV usually hands the system "pick a file" request to a
+  stub that only says "no app", so 1.2's picker could open nothing there. Settings → Background → *Background image*
+  now opens a picture screen like Projectivy Launcher's: your **Gallery, file managers and other picker apps** in a
+  row on top (each asked directly, the stub skipped), and the **pictures on the device** in a grid below — all with
+  the remote.
+- **Shown centre-cropped**, filling the screen.
+- **Any size, same speed:** the picture is prepared once when you pick it — read at a reduced size, cropped to the
+  screen's shape and scaled to the screen (at most 1920×1080) — so a 50-megapixel photo costs the overlay the same as
+  a small one. It is decoded straight into graphics memory while the list is open and released when it closes. On
+  the A50 a 6000×3375 photo opened with the list in 126 ms.
 
 ## What's new in 1.2
 
@@ -92,7 +106,7 @@ the app and keep it updated from this repo's releases:
 - **On the TV** (usually no browser): in ObtainX or Obtainium choose **Add app** and enter
   `https://github.com/Qutaiba-Khader/RecentAppsTV`, then **Add** and **Install**.
 - **Updates:** each new release here (a `v1.2`-style tag with the APK attached) shows up as an update in the app.
-  The installed version (`1.2`) and the release tag (`v1.2`) are read as the same version, so no false updates.
+  The installed version (`1.3`) and the release tag (`v1.3`) are read as the same version, so no false updates.
 - Already added before? The link only opens the existing entry. Remove it first to re-add it with these settings.
 
 <details><summary>Raw link (for ObtainX → Import from URL list, or to share)</summary>
@@ -142,7 +156,8 @@ is plain Kotlin in `logic/`, with no Android types, so it is tested on the compu
 ```
 com.websnake.recentstv
 ├─ logic/        Overlay (keys → state + effects), TaskList, Settings, SettingsNav, Geometry   ← fully tested
-├─ data/         RecentTasksRepository (Shizuku), PackageRepository (icons, labels, colours, cached), SettingsStore, BackdropImage
+├─ data/         RecentTasksRepository (Shizuku), PackageRepository (icons, labels, colours, cached), SettingsStore,
+│                ImageSources (picker apps + device pictures), BackdropImage (crop + scale once)
 ├─ ui/           theme, overlay row + pins, select zoom, hold menu, toast, settings + app lists, empty and Shizuku screens
 ├─ RecentsActivity   the overlay window: runs the effects, never finishes (steps aside → instant reopen)
 └─ SettingsActivity
@@ -155,7 +170,7 @@ Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every c
 ## Tests — the flow map
 
 The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
-fails the build on any line or branch that no test runs. 122 tests, 100 % of lines and branches; the critical conditions
+fails the build on any line or branch that no test runs. 130 tests, 100 % of lines and branches; the critical conditions
 are mutation-tested (each one is removed in a copy and a test must fail: 25 of 25 caught).
 
 ```bash

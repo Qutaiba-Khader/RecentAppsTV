@@ -7,6 +7,7 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 
 | ID | Entry | Conditions | Expected | Checks | If it fails |
 |---|---|---|---|---|---|
+|
 | P-GEO-01 | Geometry | layout places items with gap and end padding | layout places items with gap and end padding | GeometryTest.kt asserts state + effects | Geometry.kt arithmetic (px) |
 | P-GEO-02 | Geometry | empty layout is just padding | out-of-range centre is the middle | GeometryTest.kt asserts state + effects | Geometry.kt arithmetic (px) |
 | P-GEO-03 | Geometry | a strip that fits is centred as a whole | a strip that fits is centred as a whole | GeometryTest.kt asserts state + effects | Geometry.kt arithmetic (px) |
@@ -19,6 +20,8 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 | P-GEO-10 | Geometry | a negative index also falls back to the middle | a negative index also falls back to the middle | GeometryTest.kt asserts state + effects | Geometry.kt arithmetic (px) |
 | P-GEO-11 | Geometry | per-gap layout | the pinned group packs tighter inside, wider at its edges | GeometryTest.kt asserts state + effects | Geometry.kt arithmetic (px) |
 | P-GEO-12 | Geometry | a gap list shorter than the items counts the missing gaps as 0 | a gap list shorter than the items counts the missing gaps as 0 | GeometryTest.kt asserts state + effects | Geometry.kt arithmetic (px) |
+| P-GEO-13 | Geometry | sample size | a huge photo is decoded small but never below the screen | GeometryTest.kt asserts state + effects | Geometry.kt arithmetic (px) |
+| P-GEO-14 | Geometry | centre crop | wide trims the sides, tall trims top and bottom, both scaled to the screen | GeometryTest.kt asserts state + effects | Geometry.kt arithmetic (px) |
 
 ## Mode combinations
 

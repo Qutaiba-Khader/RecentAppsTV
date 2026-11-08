@@ -27,6 +27,12 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.3 (same A50): picture screen lists OneDrive, My Files, Gallery, Files; grid of the device pictures newest first;
+a 6000×3375 photo picked from the grid → overlay with it in 126 ms, PSS back to ~61 MB 6 s after closing; a picture
+picked through the Files app with the D-pad. On the TV (read-only check, nothing launched): OPEN_DOCUMENT resolves to
+`com.android.tv.frameworkpackagestubs/.Stubs$DocumentsStub` first; real pickers there: Gallery, MiXplorer, Material
+Files, DocumentsUI, the photo picker.
+
 ## 3. Speed
 
 `tools/perf/measure.sh <label>` (cold and reopen times, D-pad frame stats, memory and CPU while hidden) and

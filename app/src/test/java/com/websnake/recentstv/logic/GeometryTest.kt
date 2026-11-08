@@ -75,4 +75,20 @@ class GeometryTest {
         val l = Geometry.layout(listOf(10f, 10f, 10f), listOf(5f), 0f)
         assertEquals(15f, l.lefts[1], eps); assertEquals(25f, l.lefts[2], eps)
     }
+
+    @Test fun `P-GEO-13 sample size - a huge photo is decoded small but never below the screen`() {
+        assertEquals(4, Geometry.sampleSize(8000, 4500, 1920, 1080))
+        assertEquals(1, Geometry.sampleSize(1920, 1080, 1920, 1080))
+        assertEquals(1, Geometry.sampleSize(400, 300, 1920, 1080))
+        assertEquals(2, Geometry.sampleSize(4000, 2200, 1920, 1080))      // the shorter side decides
+        assertEquals(1, Geometry.sampleSize(8000, 1500, 1920, 1080))      // a panorama: its height decides
+    }
+
+    @Test fun `P-GEO-14 centre crop - wide trims the sides, tall trims top and bottom, both scaled to the screen`() {
+        assertEquals(Crop(500, 0, 2000, 1125, 1920, 1080), Geometry.centerCrop(3000, 1125, 1920, 1080))
+        val tall = Geometry.centerCrop(1080, 1920, 1920, 1080)          // a portrait photo
+        assertEquals(0, tall.left); assertEquals(1080, tall.width); assertEquals(607, tall.height); assertEquals(656, tall.top)
+        assertEquals(1080, tall.outW)                                   // smaller than the screen: not scaled up
+        assertEquals(Crop(0, 0, 1920, 1080, 1920, 1080), Geometry.centerCrop(1920, 1080, 1920, 1080))
+    }
 }

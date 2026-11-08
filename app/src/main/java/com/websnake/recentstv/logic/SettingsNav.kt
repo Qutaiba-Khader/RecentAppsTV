@@ -21,9 +21,10 @@ fun SetRow.section(): String? = when (this) {
     else -> null
 }
 
-enum class SetScreen { SETTINGS, EXCEPTIONS, PINNED }
+enum class SetScreen { SETTINGS, EXCEPTIONS, PINNED, IMAGES }
 
-/** [listFocus] on a list screen: 0 = the bulk-action bar, 1.. = app rows. [listAct] = bar button. */
+/** [listFocus] on a list screen: 0 = the bar (bulk actions, or picker apps on IMAGES), 1.. = rows / pictures.
+ *  [listAct] = the focused bar button. */
 data class SetState(
     val screen: SetScreen = SetScreen.SETTINGS,
     val focus: Int = 0,
@@ -37,13 +38,17 @@ enum class BulkAction { HIDE_ALL, SHOW_ALL, UNPIN_ALL }
 sealed interface SetEffect {
     data class Save(val settings: Settings) : SetEffect
     data object LoadApps : SetEffect
-    data object PickImage : SetEffect
+    data object LoadImages : SetEffect                    // device pictures + the apps that can pick one
+    data class UseImage(val index: Int) : SetEffect        // a picture from the grid (index into the list)
+    data class OpenWith(val index: Int) : SetEffect        // hand the choice to that picker app
     data class Bulk(val action: BulkAction) : SetEffect   // the screen shows a toast for it
     data object Finish : SetEffect
 }
 
 object SettingsNav {
     const val DIM_STEP = 5
+    /** Columns of the picture grid (Settings → Background → Image). */
+    const val IMAGE_COLS = 4
 
     /** Rows shown for [s], in order. The colour / image / dim rows follow the Background choice. */
     fun rows(s: Settings): List<SetRow> = SetRow.entries.filter { r ->
@@ -58,16 +63,47 @@ object SettingsNav {
     fun bulkActions(screen: SetScreen): List<BulkAction> = when (screen) {
         SetScreen.EXCEPTIONS -> listOf(BulkAction.HIDE_ALL, BulkAction.SHOW_ALL)
         SetScreen.PINNED -> listOf(BulkAction.UNPIN_ALL)
-        SetScreen.SETTINGS -> emptyList()
+        SetScreen.SETTINGS, SetScreen.IMAGES -> emptyList()
     }
 
     /**
      * [apps] = package names on the list screens, in display order.
      * Returns the new state and what to do (save, load the app list, pick an image, close).
      */
-    fun key(st: SetState, s: Settings, b: Btn, apps: List<String>): Pair<SetState, List<SetEffect>> = when (st.screen) {
+    fun key(st: SetState, s: Settings, b: Btn, apps: List<String>, pickers: Int = 0): Pair<SetState, List<SetEffect>> = when (st.screen) {
         SetScreen.SETTINGS -> settingsKey(st, s, b)
         SetScreen.EXCEPTIONS, SetScreen.PINNED -> listKey(st, s, b, apps)
+        SetScreen.IMAGES -> imagesKey(st, b, apps.size, pickers)
+    }
+
+    /**
+     * The picture screen: a bar of picker apps (Gallery, Files…) above a grid of the device's
+     * pictures, [IMAGE_COLS] wide, laid out right-to-left like the rest of Settings (LEFT = next).
+     * Without pictures (none, or no access) focus stays on the bar.
+     */
+    private fun imagesKey(st: SetState, b: Btn, n: Int, pickers: Int): Pair<SetState, List<SetEffect>> {
+        val f = st.listFocus.coerceIn(0, n)
+        val col = (f - 1) % IMAGE_COLS
+        return when (b) {
+            Btn.BACK -> st.copy(screen = SetScreen.SETTINGS) to emptyList()
+            Btn.UP -> st.copy(listFocus = if (f <= IMAGE_COLS) 0 else f - IMAGE_COLS) to emptyList()
+            Btn.DOWN -> st.copy(listFocus = when {
+                f == 0 -> if (n > 0) 1 else 0
+                f + IMAGE_COLS <= n -> f + IMAGE_COLS
+                (f - 1) / IMAGE_COLS < (n - 1) / IMAGE_COLS -> n          // a shorter last row: its last picture
+                else -> f
+            }) to emptyList()
+            Btn.LEFT -> (if (f == 0) st.copy(listAct = (st.listAct + 1).coerceAtMost((pickers - 1).coerceAtLeast(0)))
+                else if (col < IMAGE_COLS - 1 && f < n) st.copy(listFocus = f + 1) else st) to emptyList()
+            Btn.RIGHT -> (if (f == 0) st.copy(listAct = (st.listAct - 1).coerceAtLeast(0))
+                else if (col > 0) st.copy(listFocus = f - 1) else st) to emptyList()
+            Btn.OK -> when {
+                f > 0 -> st.copy(screen = SetScreen.SETTINGS) to listOf(SetEffect.UseImage(f - 1))
+                st.listAct < pickers -> st to listOf(SetEffect.OpenWith(st.listAct))
+                else -> st to emptyList()
+            }
+            else -> st to emptyList()
+        }
     }
 
     private fun settingsKey(st: SetState, s: Settings, b: Btn): Pair<SetState, List<SetEffect>> {
@@ -83,7 +119,7 @@ object SettingsNav {
                 SetRow.EXCEPTIONS, SetRow.PINNED_LIST, SetRow.BG_IMAGE ->
                     if (b == Btn.RIGHT) st to emptyList()
                     else when (row) {
-                        SetRow.BG_IMAGE -> st to listOf(SetEffect.PickImage)
+                        SetRow.BG_IMAGE -> st.copy(screen = SetScreen.IMAGES, listFocus = 1, listAct = 0) to listOf(SetEffect.LoadImages)
                         SetRow.EXCEPTIONS -> st.copy(screen = SetScreen.EXCEPTIONS, listFocus = 1, listAct = 0) to listOf(SetEffect.LoadApps)
                         else -> st.copy(screen = SetScreen.PINNED, listFocus = 1, listAct = 0) to listOf(SetEffect.LoadApps)
                     }

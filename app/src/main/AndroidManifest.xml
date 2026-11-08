@@ -12,6 +12,9 @@
     <!-- Read usage stats as a graceful fallback when privileged task APIs are unavailable -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Settings → Background → Image: the device's own pictures in the in-app grid -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- See labels/icons of all installed apps for the Exceptions list -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />

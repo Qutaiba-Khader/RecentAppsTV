@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3 — 2026-11-08
+- Background image picker for TV (as Projectivy Launcher): the picker apps (Gallery, file managers, Files…) listed
+  and asked directly — the Android TV "documents" stub is skipped — plus an in-app D-pad grid of the device's pictures
+  (MediaStore, newest first; READ_MEDIA_IMAGES, granted on install with `-g`).
+- The picture is prepared once: sub-sampled decode, centre crop to the screen shape, scaled to ≤ 1920×1080, JPEG in
+  app storage; shown centre-cropped; decoded as a hardware bitmap only while the overlay shows.
+- Tests: 130, 100 % lines and branches.
+
 ## 1.2 — 2026-11-08
 - Design update "Recent Apps TV 2": pinned apps (group, badge, running dot, left/right, small/same size, list with Unpin
   all, empty-with-pins), select zoom on OK (tile → full screen in the app colour + name, then the app opens), balloon

@@ -23,6 +23,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.lifecycleScope
 import com.websnake.recentstv.data.BackdropImage
+import com.websnake.recentstv.data.ImageSources
+import com.websnake.recentstv.data.Picker
 import com.websnake.recentstv.data.InstalledApp
 import com.websnake.recentstv.data.PackageRepository
 import com.websnake.recentstv.data.SettingsStore
@@ -35,6 +37,7 @@ import com.websnake.recentstv.logic.Settings
 import com.websnake.recentstv.logic.SettingsNav
 import com.websnake.recentstv.ui.overlay.Toast
 import com.websnake.recentstv.ui.settings.AppListScreen
+import com.websnake.recentstv.ui.settings.ImagesScreen
 import com.websnake.recentstv.ui.settings.SettingsScreen
 import com.websnake.recentstv.ui.theme.Motion
 import com.websnake.recentstv.ui.theme.RecentsTheme
@@ -56,14 +59,27 @@ class SettingsActivity : ComponentActivity() {
     private var appsLoading by mutableStateOf(false)
     private var toast by mutableStateOf<String?>(null)
     private var toastJob: Job? = null
+    private var pickers by mutableStateOf<List<Picker>>(emptyList())
+    private var images by mutableStateOf<List<Uri>>(emptyList())
+    private var imagesLoading by mutableStateOf(false)
+    private var imageAccess by mutableStateOf(false)
+    private var pickerOpenedAt = 0L
 
     private val blurSupported by lazy {
         android.os.Build.VERSION.SDK_INT >= 31 && runCatching { windowManager.isCrossWindowBlurEnabled }.getOrDefault(false)
     }
 
-    // Background image: the document picker first, then any app that offers images.
-    private val openDoc = registerForActivityResult(ActivityResultContracts.OpenDocument()) { onPicked(it) }
-    private val getContent = registerForActivityResult(ActivityResultContracts.GetContent()) { onPicked(it) }
+    // Background image: the device's pictures need the read permission (asked once, when the
+    // picture screen opens); a picker app hands back a content URI.
+    private val askRead = registerForActivityResult(ActivityResultContracts.RequestPermission()) { loadImages() }
+    private val pickWith = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri = r.data?.data
+        when {
+            uri != null -> onPicked(uri)
+            // came straight back with nothing: the app couldn't show a picker (a stub, or no storage access)
+            android.os.SystemClock.uptimeMillis() - pickerOpenedAt < 700 -> showToast("That app couldn't open a picker")
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,6 +106,7 @@ class SettingsActivity : ComponentActivity() {
                                     screen, apps, { it in settings.pinned }, settings.pinned.size,
                                     nav.listFocus, nav.listAct, appsLoading,
                                 )
+                                SetScreen.IMAGES -> ImagesScreen(pickers, images, nav.listFocus, nav.listAct, imagesLoading, imageAccess)
                             }
                         }
                         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { Toast(toast) }
@@ -103,12 +120,15 @@ class SettingsActivity : ComponentActivity() {
         val btn = Keys.btn(event.keyCode)
         if (btn == Btn.OTHER) return super.dispatchKeyEvent(event)
         if (event.action != KeyEvent.ACTION_DOWN) return true
-        val (n, effects) = SettingsNav.key(nav, settings, btn, apps.map { it.packageName })
+        val list = if (nav.screen == SetScreen.IMAGES) images.map { it.toString() } else apps.map { it.packageName }
+        val (n, effects) = SettingsNav.key(nav, settings, btn, list, pickers.size)
         nav = n
         for (e in effects) when (e) {
             is SetEffect.Save -> { settings = e.settings; lifecycleScope.launch { store.save(e.settings) } }
             SetEffect.LoadApps -> loadApps()
-            SetEffect.PickImage -> pickImage()
+            SetEffect.LoadImages -> openImages()
+            is SetEffect.UseImage -> images.getOrNull(e.index)?.let { onPicked(it) }
+            is SetEffect.OpenWith -> pickers.getOrNull(e.index)?.let { openWith(it) }
             is SetEffect.Bulk -> showToast(
                 when (e.action) {
                     BulkAction.HIDE_ALL -> "All apps hidden from recents"
@@ -130,10 +150,24 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 
-    private fun pickImage() {
-        val ok = runCatching { openDoc.launch(arrayOf("image/*")) }.isSuccess ||
-            runCatching { getContent.launch("image/*") }.isSuccess
-        if (!ok) showToast("No image picker on this device")
+    private fun openImages() {
+        imagesLoading = true
+        lifecycleScope.launch { pickers = withContext(Dispatchers.IO) { ImageSources.pickers(applicationContext) } }
+        if (ImageSources.canRead(this)) loadImages()
+        else runCatching { askRead.launch(ImageSources.readPermission()) }.onFailure { loadImages() }
+    }
+
+    private fun loadImages() {
+        imageAccess = ImageSources.canRead(this)
+        lifecycleScope.launch {
+            images = if (imageAccess) withContext(Dispatchers.IO) { ImageSources.deviceImages(applicationContext) } else emptyList()
+            imagesLoading = false
+        }
+    }
+
+    private fun openWith(p: Picker) {
+        pickerOpenedAt = android.os.SystemClock.uptimeMillis()
+        runCatching { pickWith.launch(p.intent) }.onFailure { showToast("Couldn't open ${p.label}") }
     }
 
     private fun onPicked(uri: Uri?) {
@@ -144,6 +178,7 @@ class SettingsActivity : ComponentActivity() {
             val n = settings.copy(bgImage = name)
             settings = n
             store.save(n)
+            nav = nav.copy(screen = SetScreen.SETTINGS)
             showToast("Background image set")
         }
     }

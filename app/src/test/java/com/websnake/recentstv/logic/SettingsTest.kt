@@ -120,10 +120,13 @@ class SettingsTest {
         assertEquals(Settings(), SettingsNav.edit(SetRow.EXCEPTIONS, Settings(), Btn.OK))
     }
 
-    @Test fun `P-SET-13 Background image row - OK or LEFT ask for the picker`() {
+    @Test fun `P-SET-13 Background image row - OK or LEFT open the picture screen and load it, RIGHT nothing`() {
         val s = Settings(background = Backdrop.IMAGE)
-        assertEquals(listOf(SetEffect.PickImage), key(at(SetRow.BG_IMAGE, s), s, Btn.OK).second)
+        val (n, e) = key(at(SetRow.BG_IMAGE, s).copy(listFocus = 7, listAct = 2), s, Btn.OK)
+        assertEquals(SetScreen.IMAGES, n.screen); assertEquals(1, n.listFocus); assertEquals(0, n.listAct)
+        assertEquals(listOf(SetEffect.LoadImages), e)
         assertTrue(key(at(SetRow.BG_IMAGE, s), s, Btn.RIGHT).second.isEmpty())
+        assertTrue(SettingsNav.bulkActions(SetScreen.IMAGES).isEmpty())
     }
 
     @Test fun `P-SET-14 BACK on Settings finishes, other keys do nothing`() {
@@ -179,5 +182,50 @@ class SettingsTest {
     @Test fun `P-SET-20 setPin from the overlay adds last or removes`() {
         assertEquals(listOf("b", "a"), SettingsNav.setPin(Settings(pinned = listOf("a", "b")), "a", true).pinned)
         assertEquals(listOf("b"), SettingsNav.setPin(Settings(pinned = listOf("a", "b")), "a", false).pinned)
+    }
+
+    // ── picture screen: bar of picker apps (focus 0) over a 4-wide RTL grid (1..n) ──
+    private val pics = List(10) { "p$it" }
+    private fun img(f: Int, b: Btn, pickers: Int = 3, n: List<String> = pics, act: Int = 0) =
+        SettingsNav.key(SetState(screen = SetScreen.IMAGES, listFocus = f, listAct = act), Settings(), b, n, pickers)
+
+    @Test fun `P-SET-21 pictures - LEFT is the next picture (RTL), RIGHT the previous, both stop at the row ends`() {
+        assertEquals(2, img(1, Btn.LEFT).first.listFocus)
+        assertEquals(4, img(4, Btn.LEFT).first.listFocus)          // last column
+        assertEquals(10, img(10, Btn.LEFT).first.listFocus)        // last picture
+        assertEquals(1, img(2, Btn.RIGHT).first.listFocus)
+        assertEquals(5, img(5, Btn.RIGHT).first.listFocus)         // first column
+    }
+
+    @Test fun `P-SET-22 pictures - UP DOWN by a row, the first row goes up to the bar, a short last row clamps`() {
+        assertEquals(6, img(2, Btn.DOWN).first.listFocus)
+        assertEquals(10, img(7, Btn.DOWN).first.listFocus)         // row 2 → the shorter last row
+        assertEquals(10, img(10, Btn.DOWN).first.listFocus)
+        assertEquals(9, img(9, Btn.DOWN).first.listFocus)          // already on the last row
+        assertEquals(2, img(6, Btn.UP).first.listFocus)
+        assertEquals(0, img(3, Btn.UP).first.listFocus)
+        assertEquals(1, img(0, Btn.DOWN).first.listFocus)
+        assertEquals(0, img(0, Btn.DOWN, n = emptyList()).first.listFocus)
+    }
+
+    @Test fun `P-SET-23 pictures - OK uses the picture and returns to Settings`() {
+        val (n, e) = img(3, Btn.OK)
+        assertEquals(SetScreen.SETTINGS, n.screen); assertEquals(listOf(SetEffect.UseImage(2)), e)
+    }
+
+    @Test fun `P-SET-24 picker bar - LEFT RIGHT move between apps, OK opens the focused one`() {
+        assertEquals(1, img(0, Btn.LEFT).first.listAct)
+        assertEquals(2, img(0, Btn.LEFT, act = 2).first.listAct)
+        assertEquals(0, img(0, Btn.RIGHT).first.listAct)
+        assertEquals(1, img(0, Btn.RIGHT, act = 2).first.listAct)
+        assertEquals(listOf(SetEffect.OpenWith(1)), img(0, Btn.OK, act = 1).second)
+        assertTrue(img(0, Btn.OK, pickers = 0).second.isEmpty())
+        assertEquals(0, img(0, Btn.LEFT, pickers = 0).first.listAct)
+    }
+
+    @Test fun `P-SET-25 pictures - with none loaded the focus is the bar - BACK returns, other keys nothing`() {
+        assertEquals(listOf(SetEffect.OpenWith(0)), img(1, Btn.OK, n = emptyList()).second)
+        assertEquals(SetScreen.SETTINGS, img(4, Btn.BACK).first.screen)
+        assertTrue(img(4, Btn.MENU).second.isEmpty())
     }
 }
