@@ -43,6 +43,11 @@ class PackageRepository(private val context: Context) {
         pm.getApplicationInfo(pkg, 0).enabled
     }.getOrDefault(false)
 
+    /** Has a launcher entry (leanback or phone): an app known only from usage data must be openable. */
+    fun isLaunchable(pkg: String): Boolean = runCatching {
+        pm.getLeanbackLaunchIntentForPackage(pkg) != null || pm.getLaunchIntentForPackage(pkg) != null
+    }.getOrDefault(false)
+
     /**
      * Label + category for a recent card. Reading another app's label loads that
      * app's resources (the slow part of a cold open), so the pair is also kept on

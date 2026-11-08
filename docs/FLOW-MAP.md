@@ -10,7 +10,7 @@ python3 tools/flow/flowmap.py update    # mechanical update: line numbers, skele
 ```
 
 <!-- TOTALS:START -->
-**Last clean pass 2026-11-08 20:11:02 +0300:** 108 paths, 42 gate tests · lines 417/417 (100.0%) · branches 477/477 (100.0%) · 0 justified, 0 unjustified.
+**Last clean pass 2026-11-09 01:21:39 +0300:** 120 paths, 50 gate tests · lines 492/492 (100.0%) · branches 565/565 (100.0%) · 0 justified, 0 unjustified.
 <!-- TOTALS:END -->
 
 ## Areas
@@ -19,6 +19,7 @@ python3 tools/flow/flowmap.py update    # mechanical update: line numbers, skele
 |---|---|---|---|---|
 | overlay | P-OVL | [overlay.md](flow-map/overlay.md) | OverlayTest.kt | logic/Overlay.kt |
 | tasks | P-TASK | [tasks.md](flow-map/tasks.md) | TaskListTest.kt | logic/TaskList.kt |
+| stored | P-STO | [stored.md](flow-map/stored.md) | StoredTest.kt | logic/Stored.kt |
 | settings | P-SET | [settings.md](flow-map/settings.md) | SettingsTest.kt | logic/Settings.kt, logic/SettingsNav.kt |
 | geometry | P-GEO | [geometry.md](flow-map/geometry.md) | GeometryTest.kt | logic/Geometry.kt |
 | gates | G-* | [gates.md](flow-map/gates.md) | GatesTest.kt | the conditions below |

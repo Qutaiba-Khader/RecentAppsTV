@@ -105,6 +105,7 @@ fun RecentsOverlay(
     settings: Settings,
     loadId: Int,
     onFlyComplete: (String) -> Unit,
+    limited: Boolean = false,
 ) = BoxWithConstraints(Modifier.fillMaxSize()) {
     val density = LocalDensity.current
     val viewportW = constraints.maxWidth.toFloat()
@@ -286,6 +287,13 @@ fun RecentsOverlay(
     ) {
         KeyHint("OK", "Open"); KeyHint("Hold OK", "Options"); KeyHint("↑ ↓", "Twice to remove"); KeyHint("Back", "Close")
     }
+    // 1.7: Shizuku is off (after a TV reboot): the row comes from the last list + usage access. Above the key
+    // hints, clear of the ⚙ button (on a short screen it overlapped the header)
+    if (limited) Text(
+        "Shizuku is off · apps open from their start screen · removals wait for Shizuku",
+        style = Type.small, color = LIMITED_TINT, maxLines = 1,
+        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 74.dp).graphicsLayer { alpha = footer * chrome.value },
+    )
 
     // ── select: the chosen tile grows to full screen in the app's colour ──
     if (selecting != null) {
@@ -310,6 +318,8 @@ fun RecentsOverlay(
         }
     }
 }
+
+private val LIMITED_TINT = androidx.compose.ui.graphics.Color(0xFFE8B04B)
 
 @Composable
 private fun KeyHint(key: String, label: String) {

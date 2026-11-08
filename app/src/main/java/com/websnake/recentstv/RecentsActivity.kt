@@ -36,6 +36,7 @@ import androidx.lifecycle.lifecycleScope
 import com.websnake.recentstv.data.BackdropImage
 import com.websnake.recentstv.data.RecentTask
 import com.websnake.recentstv.data.RecentTasksRepository
+import com.websnake.recentstv.data.RowStore
 import com.websnake.recentstv.data.SettingsStore
 import com.websnake.recentstv.logic.Backdrop
 import com.websnake.recentstv.logic.Btn
@@ -45,7 +46,10 @@ import com.websnake.recentstv.logic.OvState
 import com.websnake.recentstv.logic.Overlay
 import com.websnake.recentstv.logic.PinPosition
 import com.websnake.recentstv.logic.Scene
+import com.websnake.recentstv.logic.RowMode
+import com.websnake.recentstv.logic.Seen
 import com.websnake.recentstv.logic.Settings
+import com.websnake.recentstv.logic.Stored
 import com.websnake.recentstv.logic.SettingsNav
 import com.websnake.recentstv.logic.TaskRef
 import com.websnake.recentstv.shizuku.ShizukuManager
@@ -78,6 +82,7 @@ class RecentsActivity : ComponentActivity() {
 
     private lateinit var repo: RecentTasksRepository
     private lateinit var store: SettingsStore
+    private lateinit var rows: RowStore
 
     private var st by mutableStateOf(OvState())
     private var info by mutableStateOf<Map<String, RecentTask>>(emptyMap())
@@ -87,6 +92,8 @@ class RecentsActivity : ComponentActivity() {
     private var contentOn by mutableStateOf(false)
     private var toast by mutableStateOf<String?>(null)
     private var backdropImage by mutableStateOf<ImageBitmap?>(null)
+    private var shizukuRunning by mutableStateOf(false)   // gate wording: running but not granted
+    private var limited by mutableStateOf(false)      // Shizuku off: the row comes from the seed + usage access
     private var toastJob: Job? = null
     private var selectJob: Job? = null
 
@@ -98,7 +105,7 @@ class RecentsActivity : ComponentActivity() {
     // Shizuku's binder attaches asynchronously after a cold start: re-resolve the scene
     // when it arrives, but only while still waiting for it.
     private val binderReceived = Shizuku.OnBinderReceivedListener {
-        if (st.scene == Scene.LOADING || st.scene == Scene.SHIZUKU) reload()
+        if (st.scene == Scene.LOADING || st.scene == Scene.SHIZUKU || limited) reload()
     }
     private val binderDead = Shizuku.OnBinderDeadListener {
         RecentTasksRepository.dropBinders()
@@ -109,6 +116,7 @@ class RecentsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         repo = RecentTasksRepository(applicationContext)
         store = SettingsStore(applicationContext)
+        rows = RowStore(applicationContext)
         ShizukuManager.addPermissionListener(permListener)
         runCatching { Shizuku.addBinderReceivedListenerSticky(binderReceived) }
         runCatching { Shizuku.addBinderDeadListener(binderDead) }
@@ -155,11 +163,11 @@ class RecentsActivity : ComponentActivity() {
                     ) {
                         when (st.scene) {
                             Scene.LOADING -> {}
-                            Scene.SHIZUKU -> ShizukuGate(focus = st.shzFocus)
+                            Scene.SHIZUKU -> ShizukuGate(focus = st.shzFocus, running = shizukuRunning)
                             Scene.EMPTY -> EmptyState()
                             Scene.OVERLAY -> RecentsOverlay(
                                 state = st, info = info, settings = settings, loadId = loadId,
-                                onFlyComplete = ::onFlyComplete,
+                                onFlyComplete = ::onFlyComplete, limited = limited,
                             )
                         }
                     }
@@ -221,21 +229,43 @@ class RecentsActivity : ComponentActivity() {
         reloadJob?.cancel()
         reloadJob = lifecycleScope.launch {
             val t0 = SystemClock.uptimeMillis()
+            val now = System.currentTimeMillis()
             val sDef = async(Dispatchers.IO) { store.current() }
-            if (!ShizukuManager.state().ready) {
+            val shz = ShizukuManager.state()
+            val ready = shz.ready
+            shizukuRunning = shz.binderAlive
+            // Shizuku off (a TV reboot): the last row + usage access, if there is anything to show; else the gate
+            val limitedSoft = if (ready) null else withContext(Dispatchers.IO) { rows.seed() + rows.usage(now) }
+            if (!ready && limitedSoft.isNullOrEmpty()) {
                 settings = sDef.await()
+                limited = false
                 st = Overlay.needShizuku(st)
                 contentOn = true
                 return@launch
             }
-            val rawDef = async(Dispatchers.IO) { repo.readRaw().also { tRaw = SystemClock.uptimeMillis() - t0 } }
+            // with Shizuku: first replay removals made while it was off, then read the store; usage meanwhile
+            val tasksDef = if (ready) async(Dispatchers.IO) {
+                val pending = rows.pending()
+                if (pending.isNotEmpty()) { repo.replayPending(pending, now); rows.clearPending() }
+                repo.readStoredRow(now).also { tRaw = SystemClock.uptimeMillis() - t0 }
+            } else null
+            val usageDef = if (ready) async(Dispatchers.IO) {
+                if (!rows.hasUsageAccess()) repo.grantUsageAccess()
+                rows.usage(now)
+            } else null
             val s = sDef.await()
             val tSet = SystemClock.uptimeMillis() - t0
             val imgDef = if (s.background == Backdrop.IMAGE) async(Dispatchers.IO) { BackdropImage.load(applicationContext) } else null
-            val (raw, src) = rawDef.await()
-            val r = withContext(Dispatchers.IO) { repo.resolve(raw, s.exceptions, s.pinned) }
+            val stored = tasksDef?.await()
+            val tasks: List<Seen> = stored?.first.orEmpty()
+            val soft: List<Seen> = usageDef?.await() ?: limitedSoft.orEmpty()
+            val mode = if (!ready) RowMode.LIMITED else stored?.second ?: RowMode.NONE
+            val ledger = Stored.prune(rows.ledger(), now - RowStore.USAGE_DAYS * RowStore.DAY_MS)
+            val r = repo.resolveRow(tasks, soft, ledger, s.exceptions, s.pinned, Stored.ROW_MAX)
+            if (ready) launch(Dispatchers.IO) { rows.saveLedger(ledger); rows.saveSeed(repo.seedOf(tasks, soft, ledger)) }
             val tRes = SystemClock.uptimeMillis() - t0
             settings = s
+            limited = !ready
             applyBlur(s.background == Backdrop.BLUR)
             backdropImage = imgDef?.await()
             info = (r.all + r.pins).associateBy { it.packageName }
@@ -245,8 +275,9 @@ class RecentsActivity : ComponentActivity() {
                 s.showKillAll, s.pinPosition == PinPosition.RIGHT,
             )
             contentOn = true
-            val now = SystemClock.uptimeMillis()
-            Log.i(TAG, "content ${r.all.size} tasks ${r.pins.size} pins src=$src load=${now - t0}ms (settings@$tSet raw@$tRaw resolved@$tRes) sinceStart=${now - openedAt}ms")
+            val nowUp = SystemClock.uptimeMillis()
+            Log.i(TAG, "content ${r.all.size} apps (${r.all.count { (it.taskId ?: -1) > 0 }} resumable) ${r.pins.size} pins mode=$mode " +
+                "stored=${tasks.size} usage=${soft.size} load=${nowUp - t0}ms (settings@$tSet store@$tRaw resolved@$tRes) sinceStart=${nowUp - openedAt}ms")
         }
     }
 
@@ -274,7 +305,12 @@ class RecentsActivity : ComponentActivity() {
     private fun run(e: Effect) {
         when (e) {
             is Effect.Switch -> switchTo(e.pkg, e.taskId)
-            is Effect.Dismiss -> background { repo.dismiss(e.task.taskId, e.task.pkg, settings.forceStopOnKill) }
+            is Effect.Dismiss -> background {
+                val now = System.currentTimeMillis()
+                rows.saveLedger(Stored.remove(rows.ledger(), e.task.pkg, now))     // usage data can't bring it back
+                if (!repo.dismiss(e.task.taskId, e.task.pkg, settings.forceStopOnKill) && !repo.ready())
+                    rows.addPending(listOf(e.task.pkg), now)                       // removed for real once Shizuku is back
+            }
             is Effect.KillAll -> killAll(e.tasks)
             is Effect.AddException -> {
                 saveSettings(settings.copy(exceptions = settings.exceptions + e.pkg))
@@ -352,7 +388,11 @@ class RecentsActivity : ComponentActivity() {
         val pkgs = tasks.mapTo(HashSet()) { it.pkg }
         val fs = settings.forceStopOnKill
         lifecycleScope.launch {
-            val job = async(Dispatchers.IO) { repo.killAll(pkgs, fs) }
+            val job = async(Dispatchers.IO) {
+                val now = System.currentTimeMillis()
+                rows.saveLedger(Stored.killAll(rows.ledger(), now))
+                if (repo.ready()) repo.killAll(pkgs, fs) else rows.addPending(pkgs, now)
+            }
             delay(Motion.KILL_TO_EMPTY_MS.toLong())        // the staggered fly-up plays meanwhile
             job.await()
             st = Overlay.killAllDone(st)

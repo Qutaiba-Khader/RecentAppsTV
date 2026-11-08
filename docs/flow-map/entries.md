@@ -5,7 +5,7 @@ Owner = the area or test family that exercises it. A row with `TODO` fails the g
 
 | Kind | Entry | File | Owner |
 |---|---|---|---|
-| intent | `RecentsActivity` launch (LEANBACK_LAUNCHER, shortcut `open_recents`, action `com.websnake.recentstv.OPEN_RECENTS`) → `onStart` → `reload()` → `Overlay.loaded` / `Overlay.needShizuku` | RecentsActivity.kt | manual · overlay (P-OVL-01…05); A50 device run |
+| intent | `RecentsActivity` launch (LEANBACK_LAUNCHER, shortcut `open_recents`, action `com.websnake.recentstv.OPEN_RECENTS`) → `onStart` → `reload()` → (1.7) `readStoredRow` + `RowStore.usage` / seed → `Stored.merge` → `Overlay.loaded` / `Overlay.needShizuku` | RecentsActivity.kt | manual · overlay (P-OVL-01…05), stored (P-STO-01…11), gates G-ROW; A50 device run |
 | ui-event | remote key → `RecentsActivity.dispatchKeyEvent` → `Keys.btn` → `Overlay.key` | RecentsActivity.kt, Keys.kt | manual · overlay (P-OVL-10…52), gates G-GEAR, gates G-OK/G-HOLD/G-INPUT/G-DISMISS |
 | ui-event | card fly-off animation end → `onFlyComplete` → `Overlay.flyComplete` | RecentsActivity.kt | manual · overlay (P-OVL-16…18, 35) |
 | timer | Kill All: 520 ms after OK → `Overlay.killAllDone` | RecentsActivity.kt | manual · overlay (P-OVL-24, 25) |

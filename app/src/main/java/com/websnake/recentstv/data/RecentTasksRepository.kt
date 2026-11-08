@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import com.websnake.recentstv.logic.Ledger
+import com.websnake.recentstv.logic.RowMode
+import com.websnake.recentstv.logic.Seen
+import com.websnake.recentstv.logic.Stored
 import com.websnake.recentstv.logic.TaskList
 import com.websnake.recentstv.logic.TaskRef
 import com.websnake.recentstv.logic.TaskSource
@@ -30,6 +34,8 @@ import java.lang.reflect.Method
  *              infos over the binder → `am stack list` → `dumpsys activity recents`
  *  - switch  : startActivityFromRecents(taskId) (START_TASKS_FROM_RECENTS; also brings back a task
  *              whose app was killed) → moveTaskToFront → monkey (caller adds the intent fallback)
+ *  - 1.7     : the row reads the system's STORED recents (`dumpsys activity recents`) — the visible list hides
+ *              tasks unused for 6 h on the TV — merged with usage access and a removal ledger (logic/Stored.kt)
  *  - dismiss : force-stop (optional) + removeTask for every task of the package
  *  - killAll : the same for every shown package (not removeAllVisibleRecentTasks: that would also
  *              clear the apps hidden with Exceptions)
@@ -82,6 +88,81 @@ class RecentTasksRepository(private val context: Context) {
         Resolved(all.awaitAll(), pins.awaitAll().filterNotNull())
     }
 
+    // ── 1.7: the row from every source ───────────────────────────────────
+    /** Not a recent app: this app, SystemUI, Shizuku, launchers, the user's exceptions, disabled/uninstalled apps. */
+    private fun hidden(pkg: String, exceptions: Set<String>): Boolean =
+        pkg in skipPackages || TaskList.isHome(pkg, homePackages) || pkg in exceptions || !pkgRepo.isUsable(pkg)
+
+    /**
+     * Every task the system stores (`dumpsys activity recents`, the store's MRU order), plus the visible recents
+     * (getRecentTasks) as a canary for a changed dumpsys format. Null when neither can be read.
+     */
+    fun readStoredRow(now: Long): Pair<List<Seen>, RowMode>? {
+        if (!ready()) return null
+        homePackages
+        // the two reads run at once: the dumpsys process spawn is the slow part
+        val visibleJob = java.util.concurrent.FutureTask { runCatching { readRecentsSeen(now) }.getOrNull().orEmpty() }
+        Thread(visibleJob, "rtv-visible").start()
+        val stored = Stored.parse(execShell("dumpsys activity recents"))
+        val visible = visibleJob.get()
+        if (stored.isNotEmpty()) return Stored.candidates(stored, now, visible) to RowMode.STORED
+        if (visible.isNotEmpty()) return visible to RowMode.VISIBLE
+        // last resort: the 1.6 chain (root tasks → am stack list), without times (store order kept)
+        val (raw, _) = readRaw()
+        if (raw.isEmpty()) return null
+        return raw.mapIndexed { i, t -> Seen(t.pkg, t.taskId, now - i) } to RowMode.VISIBLE
+    }
+
+    /**
+     * The row: live [tasks] (trusted) + [soft] entries (usage data; with Shizuku off also the seed), merged with
+     * the removal [ledger]. A soft-only app must have a launcher entry so it can be opened.
+     */
+    suspend fun resolveRow(
+        tasks: List<Seen>, soft: List<Seen>, ledger: Ledger, exceptions: Set<String>, pinned: List<String>, max: Int,
+    ): Resolved = coroutineScope {
+        val taskPkgs = tasks.mapTo(HashSet()) { it.pkg }
+        val openable = soft.filter { it.pkg in taskPkgs || pkgRepo.isLaunchable(it.pkg) }
+        val rows = Stored.merge(tasks, openable, ledger, excluded = { hidden(it, exceptions) }, max = max)
+        val all = rows.map { r -> async(Dispatchers.IO) { describe(r.pkg, r.taskId.takeIf { it > 0 }) } }
+        val pins = pinned.filter { it !in exceptions && it !in skipPackages }.map { p ->
+            async(Dispatchers.IO) { if (pkgRepo.isUsable(p)) describe(p, rows.firstOrNull { it.pkg == p }?.taskId?.takeIf { it > 0 }) else null }
+        }
+        Resolved(all.awaitAll(), pins.awaitAll().filterNotNull())
+    }
+
+    /** The full merged row (no exceptions, generous cap) to keep as the seed for Shizuku-off opens. */
+    fun seedOf(tasks: List<Seen>, soft: List<Seen>, ledger: Ledger): List<Seen> =
+        Stored.merge(tasks, soft, ledger, excluded = { it in skipPackages || TaskList.isHome(it, homePackages) }, max = SEED_MAX)
+
+    /**
+     * Removals made while Shizuku was off ([pending]: package → when): remove every stored task of that package
+     * that was not used again after the removal. Returns how many tasks were removed.
+     */
+    fun replayPending(pending: Map<String, Long>, now: Long): Int {
+        if (!ready() || pending.isEmpty()) return 0
+        val stored = Stored.candidates(Stored.parse(execShell("dumpsys activity recents")), now)
+        var n = 0
+        for (t in stored) {
+            val at = pending[t.pkg] ?: continue
+            if (t.lastUsed <= at && removeTask(t.taskId)) n++
+        }
+        return n
+    }
+
+    /** Usage access survives reboots, Shizuku (shell) does not: while Shizuku is here, let the app keep it. */
+    fun grantUsageAccess(): Boolean {
+        if (!ready()) return false
+        execShell("appops set --user $userId ${context.packageName} GET_USAGE_STATS allow")
+        return true
+    }
+
+    /** Every task id of every package, stored and visible (for removals: hidden sibling tasks go too). */
+    private fun allTaskRefs(): List<TaskRef> {
+        // never a home task: the system Settings app also owns FallbackHome (found on the A50: Kill all removed it)
+        val stored = Stored.parse(execShell("dumpsys activity recents")).filter { it.taskId > 0 && !it.home }.map { TaskRef(it.taskId, it.pkg) }
+        return if (stored.isNotEmpty()) stored + readRaw().first.filter { r -> stored.none { it.taskId == r.taskId } } else readRaw().first
+    }
+
     private fun describe(pkg: String, taskId: Int?): RecentTask {
         val (label, category) = pkgRepo.labelAndCategory(pkg)
         return RecentTask(taskId, pkg, label, pkgRepo.icon(pkg), category, pkgRepo.brand(pkg))
@@ -103,6 +184,22 @@ class RecentTasksRepository(private val context: Context) {
                 ?: readField(info, "realActivity") as? android.content.ComponentName
                 ?: readField(info, "baseActivity") as? android.content.ComponentName
             cmp?.packageName?.let { TaskRef(id, it) }
+        }
+    }
+
+    /** getRecentTasks with wall-clock times (lastActiveTime counts from elapsedRealtime). */
+    private fun readRecentsSeen(now: Long): List<Seen>? {
+        val atm = activityTaskManager() ?: return null
+        val m = atm.javaClass.getMethod("getRecentTasks", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+        val slice = m.invoke(atm, RECENTS_MAX, RECENT_IGNORE_UNAVAILABLE, userId) ?: return null
+        val list = slice.javaClass.getMethod("getList").invoke(slice) as? List<*> ?: return null
+        val up = android.os.SystemClock.elapsedRealtime()
+        return list.filterNotNull().mapNotNull { info ->
+            val id = (readField(info, "taskId") ?: readField(info, "persistentId")) as? Int ?: return@mapNotNull null
+            val cmp = (readField(info, "baseIntent") as? Intent)?.component
+                ?: readField(info, "realActivity") as? android.content.ComponentName ?: return@mapNotNull null
+            val active = readField(info, "lastActiveTime") as? Long ?: up
+            Seen(cmp.packageName, id, now - (up - active).coerceAtLeast(0))
         }
     }
 
@@ -166,14 +263,14 @@ class RecentTasksRepository(private val context: Context) {
         if (!ready()) return false
         if (forceStop) forceStop(pkg)
         var ok = false
-        for (id in TaskList.idsFor(readRaw().first, pkg, taskId)) if (removeTask(id)) ok = true
+        for (id in TaskList.idsFor(allTaskRefs(), pkg, taskId)) if (removeTask(id)) ok = true
         return ok
     }
 
     fun killAll(pkgs: Set<String>, forceStop: Boolean) {
         if (!ready()) return
         if (forceStop) for (p in pkgs) forceStop(p)
-        for ((id, pkg) in readRaw().first) if (pkg in pkgs) removeTask(id)
+        for ((id, pkg) in allTaskRefs()) if (pkg in pkgs) removeTask(id)
     }
 
     private fun removeTask(taskId: Int): Boolean = runCatching {
@@ -247,6 +344,7 @@ class RecentTasksRepository(private val context: Context) {
         private const val RECENTS_MAX = 30       // the row shows 12; room for skipped and hidden apps
         private const val RECENT_IGNORE_UNAVAILABLE = 0x0002      // ActivityManager.RECENT_IGNORE_UNAVAILABLE
         private const val SHELL_PKG = "com.android.shell"
+        private const val SEED_MAX = 40
         // The binder proxy dies with Shizuku; dropped when its binder dies (see ShizukuManager).
         @Volatile private var atm: Any? = null
         fun dropBinders() { atm = null }

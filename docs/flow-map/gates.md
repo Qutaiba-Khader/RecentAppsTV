@@ -1,6 +1,6 @@
 # Flow map — area `gates`
 
-Critical gate decision tables (one condition flipped per test). Files covered: Overlay.kt, TaskList.kt, Geometry.kt (in `app/src/main/java/com/websnake/recentstv/logic/`). Tests: `app/src/test/java/com/websnake/recentstv/logic/GatesTest.kt`.
+Critical gate decision tables (one condition flipped per test). Files covered: Overlay.kt, TaskList.kt, Geometry.kt, Stored.kt (in `app/src/main/java/com/websnake/recentstv/logic/`). Tests: `app/src/test/java/com/websnake/recentstv/logic/GatesTest.kt`.
 Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via `tools/flow/jvm-lane.sh`).
 
 ## Paths
@@ -32,6 +32,14 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 | G-READ-null | READ | a failed binder read falls through | a failed binder read falls through | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-READ-recents | READ | a non-empty system recents list is used, an empty one is not | a non-empty system recents list is used, an empty one is not | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-READ-size | READ | a one-task binder list is not enough | a one-task binder list is not enough | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-removed | ROW | a usage entry from before its removal stays out, one after it comes back | a usage entry from before its removal stays out, one after it comes back | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-epoch | ROW | Kill all hides every usage entry from before it | Kill all hides every usage entry from before it | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-home | ROW | a home task never becomes a row candidate | a home task never becomes a row candidate | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-excluded | ROW | a task started excluded from recents never becomes a row candidate | a task started excluded from recents never becomes a row candidate | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-avail | ROW | an unavailable task never becomes a row candidate | an unavailable task never becomes a row candidate | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-resume | ROW | an app with a stored task keeps the task id when usage also has it | an app with a stored task keeps the task id when usage also has it | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-flag | ROW | only the exclude-from-recents bit marks a task excluded | only the exclude-from-recents bit marks a task excluded | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
+| G-ROW-room | ROW | usage-only apps only fill the places tasks leave | usage-only apps only fill the places tasks leave | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-CLAMP-fits | CLAMP | a strip that fits is centred whole, whatever the focus | a strip that fits is centred whole, whatever the focus | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-CLAMP-ends | CLAMP | the long strip is pinned at both ends | the long strip is pinned at both ends | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |
 | G-HOLD-release | HOLD | the release after a hold opens nothing | the release after a hold opens nothing | GatesTest.kt asserts state + effects | the gate condition named in the ID; `mutants.json` shows the flip |

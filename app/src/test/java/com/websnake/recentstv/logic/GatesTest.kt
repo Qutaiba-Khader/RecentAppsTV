@@ -238,4 +238,45 @@ class GatesTest {
         val held = hold(ready(a))
         assertTrue(release(held, Btn.OK).second.isEmpty())
     }
+
+    // ── G-ROW: the 1.7 row (stored recents + usage + removal ledger) ──
+    private val st = { pkg: String, home: Boolean, excl: Boolean, avail: Boolean -> StoredTask(1, pkg, 0, home, excl, avail) }
+
+    @Test fun `G-ROW-removed a usage entry from before its removal stays out, one after it comes back`() {
+        val l = Ledger(mapOf("a" to 100L))
+        assertTrue(Stored.merge(emptyList(), listOf(Seen("a", -1, 100)), l, { false }).isEmpty())
+        assertEquals(1, Stored.merge(emptyList(), listOf(Seen("a", -1, 101)), l, { false }).size)
+    }
+
+    @Test fun `G-ROW-epoch Kill all hides every usage entry from before it`() {
+        assertTrue(Stored.merge(emptyList(), listOf(Seen("x", -1, 199)), Ledger(epoch = 200), { false }).isEmpty())
+    }
+
+    @Test fun `G-ROW-home a home task never becomes a row candidate`() {
+        assertTrue(Stored.candidates(listOf(st("l", true, false, true)), 10).isEmpty())
+    }
+
+    @Test fun `G-ROW-excluded a task started excluded from recents never becomes a row candidate`() {
+        assertTrue(Stored.candidates(listOf(st("d", false, true, true)), 10).isEmpty())
+    }
+
+    @Test fun `G-ROW-avail an unavailable task never becomes a row candidate`() {
+        assertTrue(Stored.candidates(listOf(st("u", false, false, false)), 10).isEmpty())
+    }
+
+    @Test fun `G-ROW-resume an app with a stored task keeps the task id when usage also has it`() {
+        val r = Stored.merge(listOf(Seen("a", 5, 10)), listOf(Seen("a", -1, 50)), Ledger(), { false })
+        assertEquals(5, r.single().taskId)
+    }
+
+    @Test fun `G-ROW-flag only the exclude-from-recents bit marks a task excluded`() {
+        val t = Stored.parse("* Recent #0: Task{a #3 A=1:p.q}\n intent={flg=0x10200000 cmp=p.q/.M}")
+        assertEquals(false, t.single().excluded)
+        assertTrue(Stored.parse("* Recent #0: Task{a #3 A=1:p.q}\n intent={flg=0x00800000 cmp=p.q/.M}").single().excluded)
+    }
+
+    @Test fun `G-ROW-room usage-only apps only fill the places tasks leave`() {
+        val r = Stored.merge(listOf(Seen("t", 1, 1)), listOf(Seen("u1", -1, 9), Seen("u2", -1, 8)), Ledger(), { false }, max = 2)
+        assertEquals(listOf("u1", "t"), r.map { it.pkg })
+    }
 }

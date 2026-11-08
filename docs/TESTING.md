@@ -27,6 +27,14 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.7 test build (same A50, 2026-11-09, Shizuku in **shell** mode): usage access cleared first → granted by the app itself on
+open; row mode=STORED (13 stored + usage, 20 apps), reopen 0.18–0.33 s (store read ~140 ms: dumpsys itself 70–98 ms);
+OK on Clock → startActivityFromRecents=0; ↑↑ on a usage-only app (Calendar) → stays out after reopening; Kill all → only
+apps with a task left behind the cap stayed (fixed: tasks first) and FallbackHome was removed (fixed: never a home task);
+after Kill all only apps used later return; Shizuku stopped → LIMITED row from the seed + usage, warning line, OK opens
+Chrome by intent, ↑↑ Clock queued → Shizuku back → Clock's task removed. TV, read-only: the new rules give 25 apps from
+the store (old visible list: 1).
+
 1.6 (same A50, 2026-11-08): an app_process probe run as shell (uid 2000) on the A50 and, read-only, on the TV showed
 getRecentTasks works for shell (TV 6 = same apps as the root tasks, other order; A50 21 vs 3), moveTaskToFront with a
 null package throws for shell, startActivityFromRecents works (2 = brought to front, 0 = relaunched a killed task). The

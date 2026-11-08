@@ -32,7 +32,7 @@ import com.websnake.recentstv.ui.theme.Type
  * missing. Two focusable buttons; [focus] 0 = primary "Open & grant", 1 = Retry.
  */
 @Composable
-fun ShizukuGate(focus: Int) {
+fun ShizukuGate(focus: Int, running: Boolean = false) {
     val accent = LocalAccent.current
     Box(Modifier.fillMaxSize().background(Tokens.bg), contentAlignment = Alignment.Center) {
         Column(
@@ -65,7 +65,8 @@ fun ShizukuGate(focus: Int) {
                     .padding(horizontal = 14.dp, vertical = 7.dp),
             ) { Text("PERMISSION REQUIRED", style = Type.badge, color = accent.base) }
 
-            Text("Shizuku isn’t running", style = Type.hero, color = Tokens.text, textAlign = TextAlign.Center)
+            // 1.7: Shizuku can be running with the grant missing (after a reinstall / data clear)
+            Text(if (running) "Allow Recent Apps in Shizuku" else "Shizuku isn’t running", style = Type.hero, color = Tokens.text, textAlign = TextAlign.Center)
             Text(
                 "Recent Apps reads your task list through Shizuku. Start the Shizuku service and grant access, then return here to see your recent apps.",
                 style = Type.body, color = Tokens.textDim, textAlign = TextAlign.Center,

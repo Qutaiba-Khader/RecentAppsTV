@@ -250,5 +250,53 @@
   "file": "app/src/main/java/com/websnake/recentstv/logic/TaskList.kt",
   "find": "if (!r.isNullOrEmpty()) return r to TaskSource.RECENTS",
   "replace": "if (r != null) return r to TaskSource.RECENTS"
+ },
+ {
+  "id": "G-ROW-removed",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "if (s.lastUsed <= ledger.removedAt(s.pkg)) continue",
+  "replace": "if (s.lastUsed < ledger.removedAt(s.pkg)) continue"
+ },
+ {
+  "id": "G-ROW-epoch",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "fun removedAt(pkg: String): Long = maxOf(tombstones[pkg] ?: 0L, epoch)",
+  "replace": "fun removedAt(pkg: String): Long = tombstones[pkg] ?: 0L"
+ },
+ {
+  "id": "G-ROW-home",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "if (t.home || t.excluded || !t.available || t.taskId <= 0) continue",
+  "replace": "if (t.excluded || !t.available || t.taskId <= 0) continue"
+ },
+ {
+  "id": "G-ROW-excluded",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "if (t.home || t.excluded || !t.available || t.taskId <= 0) continue",
+  "replace": "if (t.home || !t.available || t.taskId <= 0) continue"
+ },
+ {
+  "id": "G-ROW-avail",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "if (t.home || t.excluded || !t.available || t.taskId <= 0) continue",
+  "replace": "if (t.home || t.excluded || t.taskId <= 0) continue"
+ },
+ {
+  "id": "G-ROW-resume",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "cur.taskId > 0 -> cur.copy(lastUsed = maxOf(cur.lastUsed, s.lastUsed))",
+  "replace": "cur.taskId > 0 && false -> cur.copy(lastUsed = maxOf(cur.lastUsed, s.lastUsed))"
+ },
+ {
+  "id": "G-ROW-flag",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "excluded = flg and FLAG_EXCLUDE_FROM_RECENTS.toLong() != 0L,",
+  "replace": "excluded = flg != 0L,"
+ },
+ {
+  "id": "G-ROW-room",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "val usageOnly = sorted.filter { it.taskId <= 0 }.take(max - withTask.size)",
+  "replace": "val usageOnly = sorted.filter { it.taskId <= 0 }.take(max)"
  }
 ]
