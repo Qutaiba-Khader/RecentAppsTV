@@ -1,12 +1,9 @@
 package com.websnake.recentstv.ui.overlay
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,7 +23,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +37,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -46,17 +46,20 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import com.websnake.recentstv.R
 import com.websnake.recentstv.data.RecentTask
-import com.websnake.recentstv.logic.CardShape
-import com.websnake.recentstv.logic.CardSize
 import com.websnake.recentstv.logic.Geometry
+import com.websnake.recentstv.logic.Item
 import com.websnake.recentstv.logic.OvState
 import com.websnake.recentstv.logic.PEEK_NONE
+import com.websnake.recentstv.logic.PEEK_UP
+import com.websnake.recentstv.logic.Scene
+import com.websnake.recentstv.logic.Settings
 import com.websnake.recentstv.logic.SettingsCodec
 import com.websnake.recentstv.ui.theme.LocalAccent
 import com.websnake.recentstv.ui.theme.Motion
@@ -67,190 +70,309 @@ import com.websnake.recentstv.ui.theme.shape
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
-private const val KILL_KEY = "killall"
 private val GAP = 20.dp
-private val PAD = 30.dp
+private val PIN_GAP = 16.dp
+private val GROUP_PAD = 17.dp
+private val EDGE = 38.dp
 private val PEEK = 23.dp
 private val FLY = 350.dp
-private val LABEL_GAP = 15.dp   // design: 30px → 40px below the card as it fades in
+private val LABEL_GAP = 15.dp         // design: 30px → 40px below the card as it fades in
+private val MENU_SHIFT = 97.dp        // row slides down while the long-press menu is open
+private val EMPTY_SLOT_W = 320.dp
+private val MENU_EST_H = 240.dp        // long-press menu height (header + 4 rows)
+private const val DIMMED = 0.32f
+
+/** One place in the row. [item] null = the "No recent apps" placeholder (not focusable). */
+private class Slot(val key: String, val item: Item?, val logical: Int, val width: Dp, val grouped: Boolean)
 
 /**
- * Surface 1 — the recent-apps carousel (RTL: Kill All far right, newest next to it).
- * Positions are computed (Geometry), not measured, and every moving value is read in
- * the draw phase (graphicsLayer / drawBehind), so a focus move or a dismiss animates
- * without recomposing or re-laying-out the row.
+ * Surface 1 — the recent-apps row (RTL: Kill All far right, newest next to it, pins at
+ * the chosen end). Positions are computed (Geometry), not measured, and every moving
+ * value is read in the draw phase (graphicsLayer / drawBehind), so a focus move or a
+ * dismiss animates without recomposing or re-laying-out the row.
  *
  * [loadId] changes on every fresh load: positions snap instead of sliding in.
  */
 @Composable
 fun RecentsOverlay(
     state: OvState,
-    info: Map<Int, RecentTask>,
-    size: CardSize,
-    shape: CardShape,
+    info: Map<String, RecentTask>,
+    settings: Settings,
     loadId: Int,
-    launchingId: Int?,
-    onFlyComplete: (Int) -> Unit,
+    onFlyComplete: (String) -> Unit,
 ) = BoxWithConstraints(Modifier.fillMaxSize()) {
     val density = LocalDensity.current
     val viewportW = constraints.maxWidth.toFloat()
-    val cardDp = size.dp
-    val cardPx = with(density) { cardDp.toPx() }
-    val cardShape = shape.shape()
+    val cardDp = settings.size.dp
+    val pinDp = cardDp * settings.pinSize.factor
+    val cardShape = settings.shape.shape()
+    val menuOpen = state.ctxPkg != null
+    val selecting = state.selecting
 
-    // visual order, left → right: oldest … newest, Kill All
-    val keys: List<Any> = remember(state.tasks, state.hasKillAll) {
-        buildList {
-            state.tasks.asReversed().forEach { add(it.taskId) }
-            if (state.hasKillAll) add(KILL_KEY)
-        }
+    // everything but the chosen card fades out when an app is chosen
+    val chrome = animateFloatAsState(if (selecting != null) 0f else 1f, tween(Motion.CHROME_FADE_MS), label = "chrome")
+    // the row slides down 97dp (design); on a short screen far enough for the whole menu to fit above it
+    val shiftOpen = with(density) {
+        val half = constraints.maxHeight / 2f
+        val cardHalf = (cardDp * Motion.FOCUS_SCALE / 2f).toPx()
+        val need = (MENU_EST_H + 31.dp + 8.dp).toPx() - (half - cardHalf)
+        maxOf(MENU_SHIFT.toPx(), need).coerceAtMost(half - cardHalf - 8.dp.toPx())
     }
-    val strip = remember(keys, cardPx) {
+    val shift = animateFloatAsState(
+        if (menuOpen) shiftOpen else 0f,
+        tween(Motion.MENU_SHIFT_MS, easing = Motion.standard), label = "shift",
+    )
+
+    // ── slots, visual order left → right (logical order is right → left) ──
+    val slots: List<Slot> = remember(state.items, state.emptySlot, state.pinRight, cardDp, pinDp) {
+        val logical = state.items.mapIndexed { i, it ->
+            val w = when (it) { Item.KillAll -> cardDp * 1.34f; is Item.Pin -> pinDp; is Item.Task -> cardDp }
+            Slot(it.key, it, i, w, it is Item.Pin)
+        }.toMutableList()
+        if (state.emptySlot) {
+            val e = Slot("#empty", null, -1, EMPTY_SLOT_W, false)
+            if (state.pinRight) logical.add(e) else logical.add(0, e)
+        }
+        logical.asReversed().toList()
+    }
+    val strip = remember(slots, density) {
         with(density) {
-            Geometry.layout(keys.map { if (it == KILL_KEY) cardPx * 1.34f else cardPx }, GAP.toPx(), PAD.toPx())
+            Geometry.layout(
+                slots.map { it.width.toPx() },
+                Geometry.groupGaps(slots.map { it.grouped }, GAP.toPx(), PIN_GAP.toPx(), GROUP_PAD.toPx()),
+                (EDGE + GROUP_PAD).toPx(),
+            )
         }
     }
-    val focusVisual = keys.size - 1 - state.focus
+    val focusVisual = slots.indexOfFirst { it.logical == state.focus && it.item != null }
     val targetTx = Geometry.stripOffset(viewportW, strip, focusVisual)
     val tx = remember(loadId) { Animatable(targetTx) }
     LaunchedEffect(targetTx, loadId) {
         if (tx.targetValue != targetTx) tx.animateTo(targetTx, tween(Motion.SCROLL_MS, easing = Motion.standard))
     }
 
-    // ── header: count on the left, title + gear on the right (RTL start) ──
-    Box(Modifier.fillMaxWidth().padding(start = 60.dp, end = 44.dp, top = 40.dp)) {
-        Text(
-            SettingsCodec.countLabel(state.tasks.size), style = Type.small, color = Tokens.textDim,
-            modifier = Modifier.align(Alignment.CenterStart),
+    // ── header: centred title with the count line under it ──
+    Column(
+        Modifier.fillMaxWidth().padding(top = 36.dp).graphicsLayer { alpha = chrome.value },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("Recent apps", style = Type.title, color = Tokens.text)
+        val count = SettingsCodec.countLabel(state.tasks.size, state.pins.size)
+        if (count.isNotEmpty()) Text(count, style = Type.small, color = Tokens.textDim, modifier = Modifier.padding(top = 6.dp))
+    }
+
+    // ── pinned group frame + its "Pinned" label ──
+    val pinVis = slots.indices.filter { slots[it].grouped }
+    if (pinVis.isNotEmpty()) {
+        val l = strip.lefts[pinVis.first()] - with(density) { GROUP_PAD.toPx() }
+        val r = strip.lefts[pinVis.last()] + strip.widths[pinVis.last()] + with(density) { GROUP_PAD.toPx() }
+        PinnedFrame(
+            left = l, right = r, loadId = loadId, tx = { tx.value }, shift = { shift.value },
+            pinDp = pinDp, viewportW = viewportW,
+            alpha = {
+                val chosenInside = selecting != null && slots.any { it.grouped && it.key == selecting }
+                when {
+                    selecting != null -> if (chosenInside) 0f else chrome.value
+                    menuOpen && state.ctxItem !is Item.Pin -> DIMMED
+                    else -> 1f
+                }
+            },
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            modifier = Modifier.align(Alignment.CenterEnd),
-        ) {
-            Text("Recent apps", style = Type.title, color = Tokens.text)
-            SettingsGear(focused = state.gear)
-        }
     }
 
     // ── the row ──
-    keys.forEachIndexed { vi, k ->
-        key(k) {
+    slots.forEachIndexed { vi, slot ->
+        key(slot.key) {
             val left = strip.lefts[vi]
             val leftAnim = remember(loadId) { Animatable(left) }
-            LaunchedEffect(left) {   // a neighbour was removed: slide over to close the gap
+            LaunchedEffect(left) {   // a neighbour was removed or moved: slide over
                 if (leftAnim.targetValue != left) leftAnim.animateTo(left, tween(Motion.FOCUS_MS, easing = Motion.standard))
             }
-            val logical = keys.size - 1 - vi
-            val focused = !state.gear && logical == state.focus
+            val item = slot.item
+            val focused = item != null && state.scene == Scene.OVERLAY && slot.logical == state.focus
+            val chosen = selecting != null && slot.key == selecting
+            val dim = animateFloatAsState(
+                if (menuOpen && slot.key != state.ctxPkg) DIMMED else 1f, tween(200), label = "dim",
+            )
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .graphicsLayer { translationX = leftAnim.value + tx.value },
+                    .graphicsLayer {
+                        // whole pixels: text and icon move together, no sub-pixel shimmer
+                        translationX = (leftAnim.value + tx.value).roundToInt().toFloat()
+                        translationY = shift.value.roundToInt().toFloat()
+                        alpha = dim.value * (if (chosen) 1f else chrome.value)
+                    },
             ) {
-                if (k == KILL_KEY) {
-                    KillAllTile(focused, cardDp, cardShape, state.killing)
-                } else {
-                    val task = info[k as Int]
-                    if (task != null) AppCard(
-                        task = task,
-                        focused = focused,
-                        peek = focused && state.peek != PEEK_NONE,
-                        flying = state.flying == task.taskId,
-                        killing = state.killing,
-                        staggerIndex = logical,
-                        launching = launchingId == task.taskId,
-                        dimmed = launchingId != null && launchingId != task.taskId,
-                        cardDp = cardDp, cardShape = cardShape,
-                        onFlyComplete = { onFlyComplete(task.taskId) },
-                    )
+                when (item) {
+                    null -> EmptySlotBox(cardDp)
+                    Item.KillAll -> KillAllTile(focused, cardDp, cardShape, state.killing)
+                    is Item.Task, is Item.Pin -> {
+                        val task = info[slot.key]
+                        if (task != null) AppCard(
+                            task = task,
+                            pinned = item is Item.Pin,
+                            running = item !is Item.Pin || (item as Item.Pin).running,
+                            focused = focused,
+                            pressing = focused && state.pressing,
+                            peek = if (focused) state.peek else PEEK_NONE,
+                            flying = state.flying == slot.key,
+                            flyDir = state.flyDir,
+                            killing = state.killing && item is Item.Task,
+                            staggerIndex = slot.logical,
+                            labelOn = focused && state.peek == PEEK_NONE && state.flying == null && !state.killing &&
+                                selecting == null && !menuOpen,
+                            cardDp = slot.width, cardShape = cardShape,
+                            onFlyComplete = { onFlyComplete(slot.key) },
+                        )
+                    }
                 }
             }
         }
     }
 
-    // ── one label under the focused card (design: name + category, fades in 40 ms late) ──
-    val labelTask = state.focusedTask?.takeIf {
-        state.peek == PEEK_NONE && state.flying == null && !state.killing && launchingId == null && state.ctxTaskId == null
-    }?.let { info[it.taskId] }
-    FocusLabel(
-        task = labelTask,
-        centerX = { strip.center(focusVisual) + tx.value - viewportW / 2f },
-        topOffset = cardDp * Motion.FOCUS_SCALE / 2f + LABEL_GAP,
+    // ── long-press menu, above the target card ──
+    val ctxTask = state.ctxPkg?.let { info[it] }
+    val ctxVisual = slots.indexOfFirst { it.key == state.ctxPkg }
+    ContextMenu(
+        task = ctxTask,
+        pinned = state.ctxItem is Item.Pin,
+        running = when (val it = state.ctxItem) { is Item.Pin -> it.running; is Item.Task -> true; else -> false },
+        selected = state.ctxSel,
+        anchorX = { if (ctxVisual >= 0) strip.center(ctxVisual) + tx.value else viewportW / 2f },
+        anchorTop = {
+            val w = if (ctxVisual >= 0) slots[ctxVisual].width else cardDp
+            constraints.maxHeight / 2f + shift.value - with(density) { (w * Motion.FOCUS_SCALE / 2f).toPx() }
+        },
+        viewportW = viewportW,
     )
-}
 
-@Composable
-private fun FocusLabel(task: RecentTask?, centerX: () -> Float, topOffset: Dp) {
-    val density = LocalDensity.current
-    val alpha = remember { Animatable(0f) }
-    val rise = remember { Animatable(0f) }
-    LaunchedEffect(task?.taskId) {
-        alpha.snapTo(0f); rise.snapTo(0f)
-        if (task != null) coroutineScope {
-            delay(40)
-            launch { alpha.animateTo(1f, tween(200)) }
-            launch { rise.animateTo(1f, tween(200, easing = Motion.standard)) }
-        }
-    }
-    if (task == null) return
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .requiredWidth(560.dp)
-                .graphicsLayer {
-                    translationX = centerX()
-                    translationY = with(density) { (topOffset + 5.dp * rise.value).toPx() } + size.height / 2f
-                    this.alpha = alpha.value
-                },
-        ) {
-            Text(task.label, style = Type.label, color = Tokens.text, maxLines = 1, textAlign = TextAlign.Center)
-            if (task.category.isNotBlank()) {
-                Text(
-                    task.category, style = Type.small, color = Tokens.textDim, maxLines = 1,
-                    textAlign = TextAlign.Center, modifier = Modifier.padding(top = 5.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsGear(focused: Boolean) {
-    val accent = LocalAccent.current
-    val scale by animateFloatAsState(if (focused) 1.12f else 1f, tween(Motion.FOCUS_MS, easing = Motion.standard), label = "gear")
-    val bg by animateColorAsState(if (focused) accent.base else Tokens.surface2, tween(160), label = "gearBg")
-    val fg by animateColorAsState(if (focused) accent.onDark else Tokens.textDim, tween(160), label = "gearFg")
-    Box(
-        Modifier
-            .size(40.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(12.dp))
-            .background(bg)
-            .border(1.5.dp, if (focused) accent.base else Tokens.line, RoundedCornerShape(12.dp)),
-        contentAlignment = Alignment.Center,
+    // ── footer key hints (hidden while the menu is open) ──
+    val footer by animateFloatAsState(if (menuOpen) 0f else 1f, tween(200), label = "foot")
+    Row(
+        Modifier.align(Alignment.BottomCenter).padding(bottom = 34.dp).graphicsLayer { alpha = footer * chrome.value },
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = painterResource(R.drawable.ic_settings),
-            contentDescription = "Settings",
-            colorFilter = ColorFilter.tint(fg),
-            modifier = Modifier.size(22.dp),
+        KeyHint("OK", "Open"); KeyHint("Hold OK", "Options"); KeyHint("↑ ↓", "Twice to remove"); KeyHint("Back", "Close")
+    }
+
+    // ── select: the chosen tile grows to full screen in the app's colour ──
+    if (selecting != null) {
+        val t = info[selecting]
+        val vi = slots.indexOfFirst { it.key == selecting }
+        if (t != null && vi >= 0) {
+            val w = with(density) { (slots[vi].width * Motion.PRESS_SCALE).toPx() }
+            val cx = strip.center(vi) + tx.value
+            val cy = constraints.maxHeight / 2f + shift.value
+            SelectZoom(
+                task = t,
+                from = androidx.compose.ui.geometry.Rect(cx - w / 2f, cy - w / 2f, cx + w / 2f, cy + w / 2f),
+                startRadius = settings.shape.let { s ->
+                    when (s) {
+                        com.websnake.recentstv.logic.CardShape.CIRCLE -> w / 2f
+                        com.websnake.recentstv.logic.CardShape.ROUNDED -> with(density) { 16.dp.toPx() } * Motion.PRESS_SCALE
+                        com.websnake.recentstv.logic.CardShape.SQUARE -> with(density) { 8.dp.toPx() } * Motion.PRESS_SCALE
+                    }
+                },
+                iconDp = slots[vi].width * 0.66f,
+            )
+        }
+    }
+}
+
+@Composable
+private fun KeyHint(key: String, label: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            key, style = Type.small.copy(fontWeight = FontWeight.Bold), color = Tokens.text, maxLines = 1,
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(Tokens.text.copy(alpha = 0.08f))
+                .border(1.dp, Tokens.line, RoundedCornerShape(4.dp))
+                .padding(horizontal = 7.dp, vertical = 3.dp),
         )
+        Text(label, style = Type.small, color = Tokens.textDim, maxLines = 1)
+    }
+}
+
+/** The faint rounded frame around the pinned apps, with "Pinned" above it. Moves with the strip. */
+@Composable
+private fun PinnedFrame(
+    left: Float, right: Float, loadId: Int, tx: () -> Float, shift: () -> Float,
+    pinDp: Dp, viewportW: Float, alpha: () -> Float,
+) {
+    val density = LocalDensity.current
+    val l = remember(loadId) { Animatable(left) }
+    val r = remember(loadId) { Animatable(right) }
+    LaunchedEffect(left) { if (l.targetValue != left) l.animateTo(left, tween(Motion.FOCUS_MS, easing = Motion.standard)) }
+    LaunchedEffect(right) { if (r.targetValue != right) r.animateTo(right, tween(Motion.FOCUS_MS, easing = Motion.standard)) }
+    val h = with(density) { (pinDp + GROUP_PAD * 2).toPx() }
+    Box(
+        Modifier.fillMaxSize().drawBehind {
+            val a = alpha()
+            if (a <= 0.01f) return@drawBehind
+            val x = l.value + tx()
+            val top = size.height / 2f - h / 2f + shift()
+            val cr = CornerRadius(22.dp.toPx())
+            drawRoundRect(Color.White.copy(alpha = 0.035f * a), Offset(x, top), Size(r.value - l.value, h), cr)
+            drawRoundRect(Color.White.copy(alpha = 0.07f * a), Offset(x, top), Size(r.value - l.value, h), cr, style = Stroke(1.dp.toPx()))
+        },
+    )
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier.graphicsLayer {
+                this.alpha = alpha()
+                translationX = ((l.value + r.value) / 2f + tx() - viewportW / 2f).roundToInt().toFloat()
+                translationY = (-h / 2f - 8.dp.toPx() - size.height / 2f + shift()).roundToInt().toFloat()
+            },
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(painterResource(R.drawable.ic_pin), null, colorFilter = ColorFilter.tint(Tokens.textDim), modifier = Modifier.size(13.dp))
+            Text("Pinned", style = Type.small.copy(fontWeight = FontWeight.Bold), color = Tokens.textDim, maxLines = 1)
+        }
+    }
+}
+
+/** Empty-with-pins (screen 11): a dashed placeholder where the tasks would be. */
+@Composable
+private fun EmptySlotBox(cardDp: Dp) {
+    val a = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { a.animateTo(1f, tween(Motion.FOCUS_MS)) }
+    Column(
+        Modifier
+            .size(EMPTY_SLOT_W, cardDp * 1.18f)
+            .graphicsLayer { alpha = a.value }
+            .drawBehind {
+                drawRoundRect(
+                    Color.White.copy(alpha = 0.14f), cornerRadius = CornerRadius(20.dp.toPx()),
+                    style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))),
+                )
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterVertically),
+    ) {
+        Text("No recent apps", style = Type.label, color = Tokens.text, maxLines = 1)
+        Text("Pinned apps are still one press away.", style = Type.small, color = Tokens.textDim, maxLines = 1)
     }
 }
 
 @Composable
 private fun AppCard(
     task: RecentTask,
+    pinned: Boolean,
+    running: Boolean,
     focused: Boolean,
-    peek: Boolean,
+    pressing: Boolean,
+    peek: Int,
     flying: Boolean,
+    flyDir: Int,
     killing: Boolean,
     staggerIndex: Int,
-    launching: Boolean,
-    dimmed: Boolean,
+    labelOn: Boolean,
     cardDp: Dp,
     cardShape: Shape,
     onFlyComplete: () -> Unit,
@@ -259,23 +381,26 @@ private fun AppCard(
     val accent = LocalAccent.current
     val std = tween<Float>(Motion.FOCUS_MS, easing = Motion.standard)
     val scale = animateFloatAsState(
-        when { launching -> 1.32f; focused -> Motion.FOCUS_SCALE; else -> Motion.IDLE_SCALE },
-        if (launching) tween(Motion.LAUNCH_MS, easing = Motion.standard) else std, label = "scale",
+        when { pressing -> Motion.PRESS_SCALE; focused -> Motion.FOCUS_SCALE; else -> Motion.IDLE_SCALE },
+        if (pressing) tween(Motion.PRESS_MS, easing = Motion.standard) else std, label = "scale",
     )
     val focusAmt = animateFloatAsState(if (focused) 1f else 0f, std, label = "focus")
-    val baseAlpha = animateFloatAsState(
-        when { dimmed -> 0f; focused -> 1f; else -> Motion.IDLE_ALPHA },
-        if (dimmed) tween(Motion.LAUNCH_MS) else std, label = "alpha",
-    )
-    val peekY = animateFloatAsState(if (peek) with(density) { PEEK.toPx() } else 0f, std, label = "peek")
+    val baseAlpha = animateFloatAsState(if (focused) 1f else Motion.IDLE_ALPHA, std, label = "alpha")
+    val peekY = animateFloatAsState(if (peek != PEEK_NONE) peek * with(density) { PEEK.toPx() } else 0f, std, label = "peek")
     val fly = remember { Animatable(0f) }
     val flyAlpha = remember { Animatable(1f) }
     val flyPx = with(density) { FLY.toPx() }
+    // label: fades in 40 ms after the focus lands and out as it leaves — a cross-fade, never a blink
+    val labelA = animateFloatAsState(
+        if (labelOn) 1f else 0f, if (labelOn) tween(200, delayMillis = 40) else tween(160), label = "label",
+    )
+    var labelUsed by remember { mutableStateOf(false) }
+    if (labelOn) labelUsed = true
 
     LaunchedEffect(flying) {
         if (flying) {
             coroutineScope {
-                launch { fly.animateTo(flyPx, tween(Motion.FLY_MS, easing = Motion.flyOut)) }
+                launch { fly.animateTo(flyDir * flyPx, tween(Motion.FLY_MS, easing = Motion.flyOut)) }
                 launch { flyAlpha.animateTo(0f, tween(Motion.FLY_MS, easing = Motion.flyOut)) }
             }
             onFlyComplete()
@@ -291,14 +416,14 @@ private fun AppCard(
         }
     }
 
-    // Fixed footprint = exactly one card; glow, streak and hint overflow it.
+    // Fixed footprint = exactly one card; glow, streak, label and hint overflow it.
     Box(Modifier.size(cardDp), contentAlignment = Alignment.Center) {
         // accent glow + motion streak (draw phase only)
         Box(
             Modifier
                 .requiredSize(cardDp * 1.7f)
                 .drawBehind {
-                    val f = focusAmt.value * flyAlpha.value * baseAlpha.value
+                    val f = focusAmt.value * flyAlpha.value
                     val y = peekY.value + fly.value
                     if (f > 0.01f) {
                         val s = scale.value
@@ -310,12 +435,17 @@ private fun AppCard(
                             radius = size.minDimension / 2f * s, center = center + Offset(0f, y),
                         )
                     }
-                    if (fly.value > 1f) {        // streak trailing a card flying down
+                    if (kotlin.math.abs(fly.value) > 1f) {        // streak trailing the flying card
                         val w = 3.dp.toPx(); val len = 110.dp.toPx()
-                        val tail = center.y + y - cardDp.toPx() * 0.5f
+                        val up = fly.value < 0f
+                        val edge = center.y + y + (if (up) 1f else -1f) * cardDp.toPx() * 0.5f
+                        val top = if (up) edge else edge - len
                         drawRoundRect(
-                            brush = Brush.verticalGradient(listOf(Color.Transparent, accent.glow), tail - len, tail),
-                            topLeft = Offset(center.x - w / 2f, tail - len), size = Size(w, len),
+                            brush = Brush.verticalGradient(
+                                if (up) listOf(accent.glow, Color.Transparent) else listOf(Color.Transparent, accent.glow),
+                                top, top + len,
+                            ),
+                            topLeft = Offset(center.x - w / 2f, top), size = Size(w, len),
                             cornerRadius = CornerRadius(w), alpha = 0.5f * flyAlpha.value,
                         )
                     }
@@ -352,28 +482,93 @@ private fun AppCard(
                 Text(task.label.take(1).uppercase(), style = Type.hero, color = Tokens.text)
             }
         }
-        // stage-1 hint, in the peek direction
-        AnimatedVisibility(
-            visible = peek && !flying,
-            enter = fadeIn(tween(160)), exit = fadeOut(tween(120)),
-            modifier = Modifier
-                .requiredWidth(cardDp * 4.5f)
-                .graphicsLayer { translationY = with(density) { (cardDp * 0.5f * Motion.FOCUS_SCALE + 40.dp).toPx() } },
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Row(
+        // pin badge on the top corner (RTL inline-end = left), moving with the card
+        if (pinned) {
+            Box(
+                Modifier
+                    .size(cardDp)
+                    .graphicsLayer {
+                        scaleX = scale.value; scaleY = scale.value
+                        translationY = peekY.value + fly.value
+                        alpha = flyAlpha.value
+                    },
+            ) {
+                Box(
                     Modifier
+                        .align(Alignment.TopStart)
+                        .graphicsLayer { translationX = -5.dp.toPx(); translationY = -5.dp.toPx() }
+                        .size(22.dp)
                         .clip(RoundedCornerShape(percent = 50))
-                        .background(accent.tint)
-                        .border(1.dp, accent.border, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .background(Tokens.bg)
+                        .border(1.dp, Tokens.text.copy(alpha = 0.22f), RoundedCornerShape(percent = 50)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text("▼", style = Type.small, color = accent.base)
-                    Text("Press again to remove", style = Type.small, color = accent.base, maxLines = 1)
+                    Image(painterResource(R.drawable.ic_pin), null, colorFilter = ColorFilter.tint(Tokens.text), modifier = Modifier.size(11.dp))
                 }
             }
+            // running dot under an unfocused pinned app that is also running
+            if (running) Box(
+                Modifier
+                    .graphicsLayer {
+                        translationY = (cardDp * Motion.IDLE_SCALE / 2f + 11.dp).toPx()
+                        alpha = 0.7f * (1f - focusAmt.value) * flyAlpha.value
+                    }
+                    .size(5.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(Tokens.text),
+            )
+        }
+        // name + category under the focused card
+        if (labelUsed) Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .requiredWidth(300.dp)
+                .graphicsLayer {
+                    alpha = labelA.value
+                    val y = (cardDp * Motion.FOCUS_SCALE / 2f + LABEL_GAP + 5.dp * labelA.value).toPx() + size.height / 2f
+                    translationY = y.roundToInt().toFloat()
+                },
+        ) {
+            Text(task.label, style = Type.label, color = Tokens.text, maxLines = 1, textAlign = TextAlign.Center)
+            if (task.category.isNotBlank()) {
+                Text(
+                    task.category, style = Type.small, color = Tokens.textDim, maxLines = 1,
+                    textAlign = TextAlign.Center, modifier = Modifier.padding(top = 5.dp),
+                )
+            }
+        }
+        // stage-1 hint, on the side the card is peeking to
+        PeekHint(peek = if (flying) PEEK_NONE else peek, cardDp = cardDp)
+    }
+}
+
+@Composable
+private fun PeekHint(peek: Int, cardDp: Dp) {
+    val accent = LocalAccent.current
+    var lastDir by remember { mutableStateOf(PEEK_UP) }
+    if (peek != PEEK_NONE) lastDir = peek
+    val a by animateFloatAsState(if (peek != PEEK_NONE) 1f else 0f, tween(if (peek != PEEK_NONE) 160 else 120), label = "hint")
+    if (a <= 0f) return
+    Box(
+        Modifier
+            .requiredWidth(cardDp * 4.5f)
+            .graphicsLayer {
+                alpha = a
+                translationY = lastDir * (cardDp * 0.5f * Motion.FOCUS_SCALE + 40.dp).toPx()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(percent = 50))
+                .background(accent.tint)
+                .border(1.dp, accent.border, RoundedCornerShape(percent = 50))
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(if (lastDir == PEEK_UP) "▲" else "▼", style = Type.small, color = accent.base)
+            Text("Press again to remove", style = Type.small, color = accent.base, maxLines = 1)
         }
     }
 }

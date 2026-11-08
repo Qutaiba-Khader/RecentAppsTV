@@ -1,0 +1,96 @@
+/* ── Pinned apps, long-press menu, bulk exceptions, settings sections ── */
+.pin-group{flex:0 0 auto;display:flex;align-items:center;gap:32px;padding:34px 36px;border-radius:44px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
+.pin-label{position:absolute;top:-62px;display:flex;align-items:center;gap:12px;font:700 24px/1 "Manrope";color:var(--text-dim);letter-spacing:.04em;white-space:nowrap}
+.pin-label svg,.pin-badge svg,.ctx-item svg,.lbl-ic svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pin-label svg{width:26px;height:26px}
+.card.pinned .pin-badge{position:absolute;top:-10px;inset-inline-end:-10px;width:44px;height:44px;border-radius:50%;background:#0a0b0d;border:2px solid rgba(255,255,255,.22);color:var(--text);display:flex;align-items:center;justify-content:center;z-index:2}
+.card.pinned .pin-badge svg{width:22px;height:22px}
+.run-dot{position:absolute;left:50%;bottom:-26px;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:var(--text);opacity:.7}
+.card.focused .run-dot{opacity:0}
+
+/* long-press menu (balloon from the focused card) */
+.carousel{transition:top .3s cubic-bezier(.22,.61,.36,1)}
+#tv.menu-open .carousel{top:68%}
+#tv.menu-open .card:not(.menu-open) .app-tile,#tv.menu-open .killall{opacity:.32}
+#tv.menu-open .card.menu-open .name{opacity:0}
+#tv.menu-open .ov-foot{opacity:0}
+.ctx{position:absolute;bottom:calc(100% + 62px);left:50%;transform:translate(-50%,16px);width:560px;background:#1b1e23;border:1px solid rgba(255,255,255,.12);border-radius:30px;padding:14px;box-shadow:0 40px 90px -10px rgba(0,0,0,.85);opacity:0;transition:opacity .2s ease,transform .24s cubic-bezier(.22,.61,.36,1);z-index:30;direction:ltr}
+.card.menu-open .ctx{opacity:1;transform:translate(-50%,0)}
+.ctx::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:20px solid transparent;border-top-color:#1b1e23}
+.ctx-head{display:flex;align-items:center;gap:20px;padding:12px 16px 20px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.ctx-head .app-tile{--card-size:64px;width:64px;height:64px;border-radius:18px;opacity:1!important;transform:none!important;box-shadow:none}
+.ctx-head .t{font:800 32px/1.1 "Manrope";color:var(--text)}
+.ctx-head .s{font:500 24px/1.2 "Manrope";color:var(--text-dim);margin-top:4px}
+.ctx-item{display:flex;align-items:center;gap:22px;padding:22px 24px;border-radius:18px;font:700 30px/1 "Manrope";color:var(--text);transition:background .14s ease,color .14s ease}
+.ctx-item svg{width:34px;height:34px;flex:0 0 auto}
+.ctx-item.focused{background:var(--accent);color:#08210f}
+
+/* overlay footer hints + toast */
+.ov-foot{position:absolute;bottom:72px;left:0;right:0;display:flex;justify-content:center;gap:48px;font:600 24px/1 "Manrope";color:var(--text-dim);direction:ltr;transition:opacity .2s}
+.ov-foot span{display:flex;align-items:center;gap:12px;white-space:nowrap}
+.ov-foot b{padding:7px 14px;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--text);font-weight:700}
+#tv.show-empty .ov-foot{display:none}
+#toast{position:absolute;left:50%;bottom:150px;transform:translate(-50%,20px);padding:22px 38px;border-radius:999px;background:#f3f5f7;color:#0a0b0d;font:700 28px/1 "Manrope";opacity:0;transition:opacity .2s,transform .2s;direction:ltr;white-space:nowrap;z-index:40}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* settings: sections + scroll */
+.set-scroll{position:relative;flex:1;overflow:hidden;margin:0 -20px;padding:0 20px}
+.set-list{transition:transform .28s cubic-bezier(.22,.61,.36,1);padding:6px 0 60px}
+.set-section{font:700 24px/1 "Manrope";letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);margin:26px 8px 2px;direction:ltr;text-align:right}
+.set-section:first-child{margin-top:0}
+.set-scroll::after{content:"";position:absolute;left:0;right:0;bottom:0;height:80px;background:linear-gradient(transparent,var(--bg));pointer-events:none}
+.seg.ltr{direction:ltr}
+.pos-prev{display:flex;direction:ltr;align-items:center;gap:6px;padding:12px 14px;border-radius:12px;background:#16181c;border:2px solid var(--line)}
+.pos-prev i{display:block;width:22px;height:22px;border-radius:6px;background:#3a3f48}
+.pos-prev i.p{width:15px;height:15px;background:#c9ced6}
+.pos-prev i.k{width:26px;height:26px;background:var(--accent-tint-2);border:2px solid var(--accent)}
+.pos-prev .gap{width:8px}
+.size-prev{display:flex;align-items:flex-end;gap:8px;direction:ltr}
+.size-prev i{display:block;border-radius:8px;background:#3a3f48}
+.size-prev i.p{background:#c9ced6}
+
+/* list screens: bulk actions */
+.exc-actions{display:flex;align-items:center;gap:20px;margin-bottom:30px}
+.btn.sm{padding:20px 34px;font-size:30px;display:flex;align-items:center;gap:14px}
+.btn.sm svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.exc-count{margin-inline-start:auto;font:600 var(--t-small)/1 "Manrope";color:var(--text-dim);direction:ltr;white-space:nowrap}
+.exc-count b{color:var(--text)}
+
+.empty-slot{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;width:640px;height:calc(var(--card-size) * 1.18);border-radius:40px;border:2px dashed rgba(255,255,255,.14);direction:ltr}
+.empty-slot .t{font:700 36px/1 "Manrope";color:var(--text)}
+.empty-slot .s{font:500 26px/1 "Manrope";color:var(--text-dim)}
+
+.ctx-item span,.empty-slot .s,.empty-slot .t{white-space:nowrap}
+.ctx-head .app-tile{box-shadow:none!important}
+.row .r-main{flex:1 1 auto}
+.row .r-desc{white-space:nowrap}
+
+.ov-head{flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;text-align:center}
+
+/* select animation */
+.card.pressing .app-tile,.card.focused.pressing .app-tile{transform:scale(1.06);transition-duration:.12s}
+#tv.selecting .card:not(.chosen),#tv.selecting .killall,#tv.selecting .pin-group,#tv.selecting .ov-head,#tv.selecting .ov-foot,#tv.selecting .pin-label{opacity:0;transition:opacity .22s ease}
+#tv.selecting .card.chosen .name{opacity:0}
+#tv.selecting .pin-group:has(.chosen){opacity:1;background:transparent;border-color:transparent}
+#tv.selecting .pin-group:has(.chosen) .pin-label{opacity:0}
+#zoom{position:absolute;z-index:50;--card-size:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;overflow:hidden;box-shadow:0 0 0 5px var(--accent),0 0 46px 6px var(--accent-glow);transition:left .5s cubic-bezier(.65,0,.25,1),top .5s cubic-bezier(.65,0,.25,1),width .5s cubic-bezier(.65,0,.25,1),height .5s cubic-bezier(.65,0,.25,1),border-radius .5s cubic-bezier(.65,0,.25,1),box-shadow .3s ease,opacity .4s ease}
+#zoom.grow{left:0!important;top:0!important;width:1920px!important;height:1080px!important;border-radius:0!important;box-shadow:0 0 0 0 transparent}
+#zoom .z-ic{display:flex;align-items:center;justify-content:center;width:180px;height:180px;transition:transform .5s cubic-bezier(.65,0,.25,1)}
+#zoom.grow .z-ic{transform:scale(1.2)}
+#zoom .z-name{font:800 56px/1 "Manrope";color:#fff;opacity:0;max-height:0;transition:opacity .25s ease .3s,max-height .3s ease .2s;direction:ltr;white-space:nowrap}
+#zoom.grow .z-name{opacity:1;max-height:80px}
+#zoom.fade{opacity:0}
+
+/* overlay background options */
+#scrim[data-bg="blur"]{background:rgba(0,0,0,.42);backdrop-filter:blur(28px) saturate(.8)}
+#scrim[data-bg="color"]{background:color-mix(in srgb,var(--bg-color) 94%,transparent);backdrop-filter:none}
+#scrim[data-bg="image"]{background:linear-gradient(rgba(0,0,0,.45),rgba(0,0,0,.62)),radial-gradient(90% 80% at 20% 20%,#3b2a6b 0%,transparent 60%),radial-gradient(80% 90% at 85% 80%,#0f5a4e 0%,transparent 60%),#0d0f1a;backdrop-filter:none}
+.swatches{display:flex;gap:14px;direction:ltr}
+.swatches i{width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,255,255,.18);display:block}
+.swatches i.sel{box-shadow:0 0 0 4px var(--bg),0 0 0 8px #f3f5f7}
+.bg-thumb{width:128px;height:72px;border-radius:12px;border:2px solid var(--line);background:radial-gradient(90% 80% at 20% 20%,#3b2a6b 0%,transparent 60%),radial-gradient(80% 90% at 85% 80%,#0f5a4e 0%,transparent 60%),#0d0f1a}
+#closedHint{direction:ltr;white-space:nowrap}
+
+.card .name{text-align:center;direction:ltr}
+#emptyMsg .em-s{white-space:nowrap}
+#tv.menu-open .card:not(.menu-open) .name{opacity:0}

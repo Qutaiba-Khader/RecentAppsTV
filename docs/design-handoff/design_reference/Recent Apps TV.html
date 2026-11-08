@@ -7,7 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tv/styles.css?v=3">
+<link rel="stylesheet" href="tv/styles.css?v=6">
+<link rel="stylesheet" href="tv/pins.css?v=6">
 </head>
 <body>
 <div id="stage">
@@ -37,22 +38,24 @@
           <div class="em-t">No recent apps</div>
           <div class="em-s">Apps you open will appear here.</div>
         </div>
+        <div class="ov-foot"><span><b>OK</b>Open</span><span><b>Hold OK</b>Options</span><span><b>↑ ↓</b>Twice to remove</span><span><b>Back</b>Close</span></div>
       </section>
 
       <!-- ── SETTINGS ─────────────────────────────────────────── -->
       <section id="settings" class="screen">
         <div class="set-title">Settings</div>
         <div class="set-sub">Recent Apps overlay</div>
-        <div class="set-list" id="setList"><!-- rows injected --></div>
+        <div class="set-scroll"><div class="set-list" id="setList"></div></div>
       </section>
 
       <!-- ── EXCEPTIONS ───────────────────────────────────────── -->
       <section id="exceptions" class="screen">
         <div class="exc-head">
           <span class="exc-back">→</span>
-          <div class="exc-title">Exceptions</div>
+          <div class="exc-title" id="listTitle">Exceptions</div>
         </div>
-        <div class="exc-sub">Apps switched on here are hidden from the overlay.</div>
+        <div class="exc-sub" id="listSub">Apps switched on here are hidden from the overlay.</div>
+        <div class="exc-actions" id="listActions"></div>
         <div class="exc-scroll"><div class="exc-list" id="excList"></div></div>
       </section>
 
@@ -77,6 +80,7 @@
         <div class="lc-name" id="launchName"></div>
         <div class="lc-sub">Switching…</div>
       </div>
+      <div id="toast"></div>
       <div id="closedHint">
         <span>Overlay closed</span>
         <span class="key">OK</span>
@@ -97,13 +101,14 @@
     <div class="legend">
       <span class="lg"><span class="k">←</span><span class="k">→</span> move focus</span>
       <span class="lg"><span class="k">OK</span> switch</span>
+      <span class="lg"><span class="k">hold OK</span> options</span>
       <span class="lg"><span class="k">↑</span><span class="k">↓</span> dismiss</span>
       <span class="lg"><span class="k">Esc</span> back</span>
     </div>
   </div>
 </div>
 
-<script src="tv/data.js?v=3"></script>
-<script src="tv/app.js?v=3"></script>
+<script src="tv/data.js?v=6"></script>
+<script src="tv/app.js?v=6"></script>
 </body>
 </html>

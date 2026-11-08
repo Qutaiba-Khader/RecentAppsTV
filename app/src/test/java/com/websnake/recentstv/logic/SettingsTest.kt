@@ -1,76 +1,107 @@
 package com.websnake.recentstv.logic
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Area SET — stored settings and the Settings / Exceptions keys (docs/flow-map/settings.md). */
+/** Area SET — stored settings and the Settings / Pinned apps / Exceptions keys (docs/flow-map/settings.md). */
 class SettingsTest {
 
     private val apps = listOf("app.a", "app.b", "app.c")
     private fun key(st: SetState, s: Settings, b: Btn) = SettingsNav.key(st, s, b, apps)
-    private fun saved(e: List<SetEffect>) = (e.single() as SetEffect.Save).settings
+    private fun saved(e: List<SetEffect>) = (e.first() as SetEffect.Save).settings
+    private fun at(row: SetRow, s: Settings = Settings()) = SetState(focus = SettingsNav.rows(s).indexOf(row))
 
     @Test fun `P-SET-01 decode of an empty store gives the defaults (design values)`() {
         val s = SettingsCodec.decode { null }
         assertEquals(Settings(), s); assertEquals(66, s.bgDim); assertEquals(CardSize.MEDIUM, s.size)
+        assertEquals(PinPosition.LEFT, s.pinPosition); assertEquals(PinSize.SMALL, s.pinSize); assertEquals(Backdrop.DIM, s.background)
+        assertTrue(s.pinned.isEmpty()); assertNull(s.bgImage)
     }
 
-    @Test fun `P-SET-02 encode then decode round-trips every field (v1 key names)`() {
-        val s = Settings(false, CardSize.LARGE, CardShape.CIRCLE, setOf("x"), Accent.PINK, 40, Tint.NAVY, false)
+    @Test fun `P-SET-02 encode then decode round-trips every field (v1 key names kept)`() {
+        val s = Settings(false, CardSize.LARGE, CardShape.CIRCLE, setOf("x"), Accent.PINK, 40, false,
+            listOf("p.b", "p.a"), PinPosition.RIGHT, PinSize.SAME, Backdrop.IMAGE, 3, "wall.jpg")
         val m = SettingsCodec.encode(s)
         assertEquals(s, SettingsCodec.decode { m[it] })
-        assertTrue(m.keys.containsAll(listOf("show_kill_all", "bg_dim_pct", "force_stop_on_kill", "exceptions")))
+        assertTrue(m.keys.containsAll(listOf("show_kill_all", "bg_dim_pct", "force_stop_on_kill", "exceptions", "pinned")))
     }
 
-    @Test fun `P-SET-03 unknown names, wrong types and out-of-range dim fall back safely`() {
-        val m = mapOf<String, Any>("size" to "HUGE", "shape" to 3, "bg_dim_pct" to 250, "show_kill_all" to "yes")
+    @Test fun `P-SET-03 unknown names, wrong types and out-of-range numbers fall back safely`() {
+        val m = mapOf<String, Any>("size" to "HUGE", "shape" to 3, "bg_dim_pct" to 250, "show_kill_all" to "yes",
+            "bg_color" to 99, "bg_image" to "  ", "pinned" to 5)
         val s = SettingsCodec.decode { m[it] }
         assertEquals(CardSize.MEDIUM, s.size); assertEquals(CardShape.ROUNDED, s.shape)
-        assertEquals(100, s.bgDim); assertEquals(true, s.showKillAll)
+        assertEquals(100, s.bgDim); assertEquals(true, s.showKillAll); assertEquals(4, s.bgColor)
+        assertNull(s.bgImage); assertTrue(s.pinned.isEmpty())
         assertEquals(0, SettingsCodec.decode { if (it == "bg_dim_pct") -5 else null }.bgDim)
     }
 
-    @Test fun `P-SET-04 summary and count labels`() {
+    @Test fun `P-SET-04 the pin list keeps its order, drops blanks and repeats`() {
+        assertEquals(listOf("b", "a"), SettingsCodec.decode { if (it == "pinned") "b\n\n a \nb\na" else null }.pinned)
+        assertEquals("", SettingsCodec.encode(Settings())["bg_image"])
+    }
+
+    @Test fun `P-SET-05 summary and count labels`() {
         assertEquals("No apps hidden", SettingsCodec.exceptionsSummary(0))
         assertEquals("1 app hidden", SettingsCodec.exceptionsSummary(1))
         assertEquals("3 apps hidden", SettingsCodec.exceptionsSummary(3))
-        assertEquals("", SettingsCodec.countLabel(0)); assertEquals("1 app", SettingsCodec.countLabel(1)); assertEquals("8 apps", SettingsCodec.countLabel(8))
+        assertEquals("No apps pinned", SettingsCodec.pinnedSummary(0))
+        assertEquals("1 app pinned", SettingsCodec.pinnedSummary(1))
+        assertEquals("2 apps pinned", SettingsCodec.pinnedSummary(2))
+        assertEquals("", SettingsCodec.countLabel(0)); assertEquals("1 app", SettingsCodec.countLabel(1))
+        assertEquals("7 apps · 3 pinned", SettingsCodec.countLabel(7, 3)); assertEquals("2 pinned", SettingsCodec.countLabel(0, 2))
     }
 
-    @Test fun `P-SET-05 UP DOWN move between rows and clamp`() {
+    @Test fun `P-SET-06 rows follow the Background choice and carry their section titles`() {
+        assertTrue(SetRow.BG_DIM in SettingsNav.rows(Settings()))
+        val color = SettingsNav.rows(Settings(background = Backdrop.COLOR))
+        assertTrue(SetRow.BG_COLOR in color && SetRow.BG_DIM !in color && SetRow.BG_IMAGE !in color)
+        assertTrue(SetRow.BG_IMAGE in SettingsNav.rows(Settings(background = Backdrop.IMAGE)))
+        assertEquals(10, SettingsNav.rows(Settings(background = Backdrop.BLUR)).size)
+        assertEquals(listOf("Overlay", "Pinned apps", "Background", "Hidden apps"), SetRow.entries.mapNotNull { it.section() })
+    }
+
+    @Test fun `P-SET-07 UP DOWN move between rows and clamp`() {
         val s = Settings()
         assertEquals(0, key(SetState(focus = 0), s, Btn.UP).first.focus)
         assertEquals(1, key(SetState(focus = 0), s, Btn.DOWN).first.focus)
-        val last = SetRow.entries.lastIndex
+        val last = SettingsNav.rows(s).lastIndex
         assertEquals(last, key(SetState(focus = last), s, Btn.DOWN).first.focus)
     }
 
-    @Test fun `P-SET-06 toggle rows flip with OK, LEFT or RIGHT`() {
-        val s = Settings()
+    @Test fun `P-SET-08 toggle rows flip with OK, LEFT or RIGHT, both ways`() {
         for (b in listOf(Btn.OK, Btn.LEFT, Btn.RIGHT)) {
-            assertEquals(false, saved(key(SetState(focus = SetRow.KILL_ALL.ordinal), s, b).second).showKillAll)
-            assertEquals(false, saved(key(SetState(focus = SetRow.FORCE_STOP.ordinal), s, b).second).forceStopOnKill)
+            assertEquals(false, saved(key(at(SetRow.KILL_ALL), Settings(), b).second).showKillAll)
+            assertEquals(false, saved(key(at(SetRow.FORCE_STOP), Settings(), b).second).forceStopOnKill)
         }
+        val off = Settings(showKillAll = false, forceStopOnKill = false)
+        assertEquals(true, SettingsNav.edit(SetRow.KILL_ALL, off, Btn.OK).showKillAll)
+        assertEquals(true, SettingsNav.edit(SetRow.FORCE_STOP, off, Btn.OK).forceStopOnKill)
     }
 
-    @Test fun `P-SET-07 segmented rows step RTL - RIGHT earlier, LEFT later, OK cycles`() {
-        val st = SetState(focus = SetRow.SIZE.ordinal)
-        assertEquals(CardSize.SMALL, saved(key(st, Settings(), Btn.RIGHT).second).size)
-        assertEquals(CardSize.LARGE, saved(key(st, Settings(), Btn.LEFT).second).size)
-        assertEquals(CardSize.SMALL, saved(key(st, Settings(size = CardSize.LARGE), Btn.OK).second).size)
-        // at the end, a step outward changes nothing → nothing saved
-        assertTrue(key(st, Settings(size = CardSize.LARGE), Btn.LEFT).second.isEmpty())
+    @Test fun `P-SET-09 segmented rows step RTL - RIGHT earlier, LEFT later, OK cycles, ends save nothing`() {
+        assertEquals(CardSize.SMALL, saved(key(at(SetRow.SIZE), Settings(), Btn.RIGHT).second).size)
+        assertEquals(CardSize.LARGE, saved(key(at(SetRow.SIZE), Settings(), Btn.LEFT).second).size)
+        assertEquals(CardSize.SMALL, saved(key(at(SetRow.SIZE), Settings(size = CardSize.LARGE), Btn.OK).second).size)
+        assertTrue(key(at(SetRow.SIZE), Settings(size = CardSize.LARGE), Btn.LEFT).second.isEmpty())
+        assertEquals(CardShape.CIRCLE, saved(key(at(SetRow.SHAPE), Settings(), Btn.LEFT).second).shape)
+        assertEquals(Accent.BLUE, saved(key(at(SetRow.ACCENT), Settings(), Btn.OK).second).accent)
+        assertEquals(PinSize.SAME, saved(key(at(SetRow.PIN_SIZE), Settings(), Btn.LEFT).second).pinSize)
+        assertEquals(Backdrop.BLUR, saved(key(at(SetRow.BACKGROUND), Settings(), Btn.LEFT).second).background)
     }
 
-    @Test fun `P-SET-08 shape accent and tint rows step the same way`() {
-        assertEquals(CardShape.CIRCLE, saved(key(SetState(focus = SetRow.SHAPE.ordinal), Settings(), Btn.LEFT).second).shape)
-        assertEquals(Accent.BLUE, saved(key(SetState(focus = SetRow.ACCENT.ordinal), Settings(), Btn.OK).second).accent)
-        assertEquals(Tint.BLACK, saved(key(SetState(focus = SetRow.BG_TINT.ordinal), Settings(), Btn.RIGHT).second).bgTint)
+    @Test fun `P-SET-10 Pinned position and colour swatches read literally (LTR)`() {
+        assertEquals(PinPosition.RIGHT, saved(key(at(SetRow.PIN_POSITION), Settings(), Btn.RIGHT).second).pinPosition)
+        assertEquals(PinPosition.LEFT, saved(key(at(SetRow.PIN_POSITION), Settings(pinPosition = PinPosition.RIGHT), Btn.LEFT).second).pinPosition)
+        val c = Settings(background = Backdrop.COLOR)
+        assertEquals(1, saved(key(at(SetRow.BG_COLOR, c), c, Btn.RIGHT).second).bgColor)
+        assertTrue(key(at(SetRow.BG_COLOR, c), c, Btn.LEFT).second.isEmpty())
     }
 
-    @Test fun `P-SET-09 dim bar - LEFT and OK raise by 5, RIGHT lowers, clamped 0 to 100`() {
-        val st = SetState(focus = SetRow.BG_DIM.ordinal)
+    @Test fun `P-SET-11 dim bar - LEFT and OK raise by 5, RIGHT lowers, clamped 0 to 100`() {
+        val st = at(SetRow.BG_DIM)
         assertEquals(71, saved(key(st, Settings(), Btn.LEFT).second).bgDim)
         assertEquals(71, saved(key(st, Settings(), Btn.OK).second).bgDim)
         assertEquals(61, saved(key(st, Settings(), Btn.RIGHT).second).bgDim)
@@ -78,47 +109,75 @@ class SettingsTest {
         assertTrue(key(st, Settings(bgDim = 0), Btn.RIGHT).second.isEmpty())
     }
 
-    @Test fun `P-SET-10 Exceptions row - OK or LEFT opens and loads apps, RIGHT does nothing`() {
-        val st = SetState(focus = SetRow.EXCEPTIONS.ordinal, excFocus = 4)
+    @Test fun `P-SET-12 Exceptions and Pinned apps rows - OK or LEFT open a list and load apps, RIGHT nothing`() {
         for (b in listOf(Btn.OK, Btn.LEFT)) {
-            val (n, e) = key(st, Settings(), b)
-            assertEquals(SetScreen.EXCEPTIONS, n.screen); assertEquals(0, n.excFocus); assertEquals(listOf(SetEffect.LoadApps), e)
+            val (n, e) = key(at(SetRow.EXCEPTIONS).copy(listFocus = 5, listAct = 1), Settings(), b)
+            assertEquals(SetScreen.EXCEPTIONS, n.screen); assertEquals(1, n.listFocus); assertEquals(0, n.listAct)
+            assertEquals(listOf(SetEffect.LoadApps), e)
+            assertEquals(SetScreen.PINNED, key(at(SetRow.PINNED_LIST), Settings(), b).first.screen)
         }
-        assertEquals(st to emptyList<SetEffect>(), key(st, Settings(), Btn.RIGHT))
+        assertEquals(at(SetRow.EXCEPTIONS) to emptyList<SetEffect>(), key(at(SetRow.EXCEPTIONS), Settings(), Btn.RIGHT))
         assertEquals(Settings(), SettingsNav.edit(SetRow.EXCEPTIONS, Settings(), Btn.OK))
     }
 
-    @Test fun `P-SET-11 BACK on Settings finishes, other keys do nothing`() {
+    @Test fun `P-SET-13 Background image row - OK or LEFT ask for the picker`() {
+        val s = Settings(background = Backdrop.IMAGE)
+        assertEquals(listOf(SetEffect.PickImage), key(at(SetRow.BG_IMAGE, s), s, Btn.OK).second)
+        assertTrue(key(at(SetRow.BG_IMAGE, s), s, Btn.RIGHT).second.isEmpty())
+    }
+
+    @Test fun `P-SET-14 BACK on Settings finishes, other keys do nothing`() {
         assertEquals(listOf(SetEffect.Finish), key(SetState(), Settings(), Btn.BACK).second)
         assertEquals(SetState() to emptyList<SetEffect>(), key(SetState(), Settings(), Btn.MENU))
     }
 
-    @Test fun `P-SET-12 Exceptions - UP DOWN clamp to the list, OK toggles the focused app`() {
-        val st = SetState(screen = SetScreen.EXCEPTIONS, excFocus = 0)
-        assertEquals(0, key(st, Settings(), Btn.UP).first.excFocus)
-        assertEquals(2, key(st.copy(excFocus = 2), Settings(), Btn.DOWN).first.excFocus)
-        assertEquals(setOf("app.b"), saved(key(st.copy(excFocus = 1), Settings(), Btn.OK).second).exceptions)
-        assertEquals(emptySet<String>(), saved(key(st.copy(excFocus = 1), Settings(exceptions = setOf("app.b")), Btn.OK).second).exceptions)
+    @Test fun `P-SET-15 list - UP reaches the bulk bar, DOWN clamps to the list, OK toggles the row`() {
+        val st = SetState(screen = SetScreen.EXCEPTIONS, listFocus = 1)
+        assertEquals(0, key(st, Settings(), Btn.UP).first.listFocus)
+        assertEquals(0, key(st.copy(listFocus = 0), Settings(), Btn.UP).first.listFocus)
+        assertEquals(3, key(st.copy(listFocus = 3), Settings(), Btn.DOWN).first.listFocus)
+        assertEquals(setOf("app.b"), saved(key(st.copy(listFocus = 2), Settings(), Btn.OK).second).exceptions)
+        assertEquals(emptySet<String>(), saved(key(st.copy(listFocus = 2), Settings(exceptions = setOf("app.b")), Btn.OK).second).exceptions)
     }
 
-    @Test fun `P-SET-13 Exceptions - BACK or RIGHT returns - OK on an empty list does nothing`() {
-        val st = SetState(screen = SetScreen.EXCEPTIONS)
+    @Test fun `P-SET-16 Pinned list - OK pins at the end, again unpins`() {
+        val st = SetState(screen = SetScreen.PINNED, listFocus = 1)
+        assertEquals(listOf("z", "app.a"), saved(key(st, Settings(pinned = listOf("z")), Btn.OK).second).pinned)
+        assertEquals(listOf("z"), saved(key(st, Settings(pinned = listOf("app.a", "z")), Btn.OK).second).pinned)
+    }
+
+    @Test fun `P-SET-17 bulk bar - LEFT RIGHT move between buttons, OK runs Hide all, Show all, Unpin all`() {
+        val bar = SetState(screen = SetScreen.EXCEPTIONS, listFocus = 0)
+        assertEquals(1, key(bar, Settings(), Btn.LEFT).first.listAct)
+        assertEquals(1, key(bar.copy(listAct = 1), Settings(), Btn.LEFT).first.listAct)
+        assertEquals(0, key(bar.copy(listAct = 1), Settings(), Btn.RIGHT).first.listAct)
+        assertEquals(0, key(bar, Settings(), Btn.RIGHT).first.listAct)
+        val (_, hide) = key(bar, Settings(exceptions = setOf("x")), Btn.OK)
+        assertEquals(setOf("x") + apps, saved(hide).exceptions); assertEquals(SetEffect.Bulk(BulkAction.HIDE_ALL), hide[1])
+        assertTrue(saved(key(bar.copy(listAct = 1), Settings(exceptions = setOf("x")), Btn.OK).second).exceptions.isEmpty())
+        val pins = SetState(screen = SetScreen.PINNED, listFocus = 0)
+        assertTrue(saved(key(pins, Settings(pinned = listOf("a")), Btn.OK).second).pinned.isEmpty())
+        assertEquals(pins.copy(listAct = 5) to emptyList<SetEffect>(), key(pins.copy(listAct = 5), Settings(), Btn.OK))
+    }
+
+    @Test fun `P-SET-18 list - BACK or RIGHT on a row return, OK past the list does nothing`() {
+        val st = SetState(screen = SetScreen.PINNED, listFocus = 2)
         assertEquals(SetScreen.SETTINGS, key(st, Settings(), Btn.BACK).first.screen)
         assertEquals(SetScreen.SETTINGS, key(st, Settings(), Btn.RIGHT).first.screen)
-        val empty = SettingsNav.key(st, Settings(), Btn.OK, emptyList())
-        assertTrue(empty.second.isEmpty())
-        assertEquals(0, SettingsNav.key(st, Settings(), Btn.DOWN, emptyList()).first.excFocus)
         assertEquals(st, key(st, Settings(), Btn.LEFT).first)
+        assertTrue(SettingsNav.key(st, Settings(), Btn.OK, emptyList()).second.isEmpty())
+        assertEquals(0, SettingsNav.key(st.copy(listFocus = 0), Settings(), Btn.DOWN, emptyList()).first.listFocus)
+        assertEquals(st to emptyList<SetEffect>(), key(st, Settings(), Btn.MENU))
+        assertTrue(SettingsNav.bulkActions(SetScreen.SETTINGS).isEmpty())
     }
 
-    @Test fun `P-SET-14 step with an unknown current value starts from the first`() {
+    @Test fun `P-SET-19 step with an unknown current value starts from the first`() {
         assertEquals("b", SettingsNav.step(listOf("a", "b"), "zz", Btn.OK))
         assertEquals("zz", SettingsNav.step(listOf("a", "b"), "zz", Btn.UP))
     }
 
-    @Test fun `P-SET-15 toggles switch back on as well`() {
-        val off = Settings(showKillAll = false, forceStopOnKill = false)
-        assertEquals(true, SettingsNav.edit(SetRow.KILL_ALL, off, Btn.OK).showKillAll)
-        assertEquals(true, SettingsNav.edit(SetRow.FORCE_STOP, off, Btn.OK).forceStopOnKill)
+    @Test fun `P-SET-20 setPin from the overlay adds last or removes`() {
+        assertEquals(listOf("b", "a"), SettingsNav.setPin(Settings(pinned = listOf("a", "b")), "a", true).pinned)
+        assertEquals(listOf("b"), SettingsNav.setPin(Settings(pinned = listOf("a", "b")), "a", false).pinned)
     }
 }

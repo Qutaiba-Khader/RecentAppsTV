@@ -10,7 +10,7 @@ python3 tools/flow/flowmap.py update    # mechanical update: line numbers, skele
 ```
 
 <!-- TOTALS:START -->
-**Last clean pass 2026-11-08 15:16:07 +0300:** 77 paths, 19 gate tests · lines 250/250 (100.0%) · branches 274/274 (100.0%) · 0 justified, 0 unjustified.
+**Last clean pass 2026-11-08 17:52:22 +0300:** 93 paths, 25 gate tests · lines 367/367 (100.0%) · branches 391/391 (100.0%) · 0 justified, 0 unjustified.
 <!-- TOTALS:END -->
 
 ## Areas
@@ -41,7 +41,9 @@ One chain per main flow, from an entry to its visible result. Name files and sym
 open:    launcher/shortcut → RecentsActivity.onStart → reload → RecentTasksRepository.readRaw [DEV: Shizuku binder]
          → TaskList.read → TaskList.select → Overlay.loaded → RecentsOverlay (Geometry.stripOffset) → the row
 key:     remote key → Keys.btn → Overlay.key → effects → RecentsActivity.run [DEV: moveTaskToFront/removeTask] → new state drawn
-dismiss: DOWN, DOWN → Overlay.key (peek, flying) → AppCard fly-off → Overlay.flyComplete → Effect.Dismiss [DEV: force-stop + removeTask]
+dismiss: UP,UP or DOWN,DOWN → Overlay.key (peek, flying) → AppCard fly-off → Overlay.flyComplete → Effect.Dismiss [DEV: force-stop + removeTask]
+select:  OK → Overlay.key (pressing, selecting) → SelectZoom 500 ms + hold 400 ms → RecentsActivity.switchTo [DEV: moveTaskToFront / launch intent]
+menu:    hold OK → Overlay.ctxKey → Effect.SetPin / AddException [DB] / AppInfo / OpenSettings
 close:   BACK → Overlay.key → Effect.Close → fade 170 ms → moveTaskToBack (kept hot for the next open)
 settings: SettingsActivity key → SettingsNav.key → SetEffect.Save → SettingsStore [DB: SharedPreferences] → next open reads it
 ```
@@ -54,9 +56,11 @@ outcome changes. Tests are named `G-<GATE>-<condition>`; `flow-map/mutants.json`
 
 | Gate | Where | Conditions | Outcome decided |
 |---|---|---|---|
-| G-OK | Overlay.key | scene = OVERLAY · btn = OK · !gear · !busy · !killing · flying = null | OK taps on release / holds open the menu, or the scene handles it on press |
-| G-HOLD | Overlay.key | repeat = 1 · !Kill All focused (redundant, see mutants.json) · a task under focus | a held OK opens the context menu |
-| G-INPUT | Overlay.overlayKey | busy · killing · flying | the overlay ignores keys while it is changing (P-OVL-36 defect) |
+| G-OK | Overlay.key | scene = OVERLAY · btn = OK · !busy · !killing · flying = null | OK presses in / taps on release / holds open the menu, or the scene handles it on press |
+| G-HOLD | Overlay.key | repeat = 1 · a card (task or pin) under focus · the release after a hold or a menu OK opens nothing | a held OK opens the menu; no stray app opens (A50 find, P-OVL-46) |
+| G-INPUT | Overlay.key / overlayKey | busy · killing · flying · selecting | the overlay ignores keys while it is changing |
+| G-DISMISS | Overlay.dismissStep | focused item is a running task · same direction twice | only tasks are swiped away, and only on the second press |
+| G-ROW | OvState.items / Overlay.settle | pinned running app leaves the tasks · Kill All needs the setting and a task · Empty needs no tasks and no pins | who sits in the row |
 | G-SELECT | TaskList.select | taskId > 0 · package not blank · first of its package · not excluded | which apps the user sees |
 | G-READ | TaskList.read | binder result present · at least two tasks | which source the list is trusted from |
 | G-CLAMP | Geometry.stripOffset | strip fits · clamp at both ends | Kill All never leaves the screen |

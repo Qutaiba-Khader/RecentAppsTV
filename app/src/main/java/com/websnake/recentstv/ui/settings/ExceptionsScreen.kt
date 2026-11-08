@@ -5,11 +5,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,35 +32,73 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
+import com.websnake.recentstv.R
 import com.websnake.recentstv.data.InstalledApp
+import com.websnake.recentstv.logic.BulkAction
+import com.websnake.recentstv.logic.SetScreen
+import com.websnake.recentstv.logic.SettingsNav
 import com.websnake.recentstv.ui.theme.LocalAccent
 import com.websnake.recentstv.ui.theme.Motion
 import com.websnake.recentstv.ui.theme.Tokens
 import com.websnake.recentstv.ui.theme.Type
 
-/** Surface 2b — installed apps with per-app "hide from recents" toggles (RTL, design). */
+/**
+ * Exceptions (screens 16–18: toggle on = hidden, Hide all / Show all) and Pinned apps
+ * (screen 15: toggle on = pinned, Unpin all). [focus] 0 = the bulk bar ([act] = its
+ * button), 1.. = app rows.
+ */
 @Composable
-fun ExceptionsScreen(apps: List<InstalledApp>, excluded: Set<String>, focus: Int, loading: Boolean) {
+fun AppListScreen(
+    screen: SetScreen,
+    apps: List<InstalledApp>,
+    isOn: (String) -> Boolean,
+    onCount: Int,
+    focus: Int,
+    act: Int,
+    loading: Boolean,
+) {
+    val pins = screen == SetScreen.PINNED
+    val title = if (pins) "Pinned apps" else "Exceptions"
+    val subtitle = if (pins) "Pinned apps always appear in the row, running or not." else "Apps switched on here are hidden from the overlay."
+    val onLabel = if (pins) "Pinned" else "Hidden from recents"
+    val offLabel = if (pins) "Not pinned" else "Shown"
     val listState = rememberLazyListState()
-    KeepInView(listState, focus)
+    KeepInView(listState, (focus - 1).coerceAtLeast(0))
 
     Column(Modifier.fillMaxSize().background(Tokens.bg).padding(start = 60.dp, end = 60.dp, top = 40.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("→", style = Type.title, color = Tokens.textDim)       // back affordance (RTL: rightmost)
-            Text("Exceptions", style = Type.hero, color = Tokens.text)
+            Text(title, style = Type.hero, color = Tokens.text)
         }
         Text(
-            "Apps switched on here are hidden from the overlay.",
-            style = Type.body, color = Tokens.textDim, textAlign = TextAlign.Right,
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 22.dp),
+            subtitle, style = Type.body, color = Tokens.textDim, textAlign = TextAlign.Right,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 14.dp),
         )
+        // bulk bar — reached with UP from the first row; LEFT/RIGHT move between buttons
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SettingsNav.bulkActions(screen).forEachIndexed { i, a -> BulkButton(a, focus == 0 && i == act) }
+            Spacer(Modifier.weight(1f))
+            Text(
+                buildAnnotatedString {
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = Tokens.text)) { append("$onCount") }
+                    append(if (pins) " pinned" else " of ${apps.size} hidden")
+                },
+                style = Type.small.copy(fontWeight = FontWeight.SemiBold), color = Tokens.textDim, maxLines = 1,
+            )
+        }
+        Spacer(Modifier.size(14.dp))
         if (loading && apps.isEmpty()) {
             Text("Loading apps…", style = Type.body, color = Tokens.textFaint)
             return@Column
@@ -76,17 +116,42 @@ fun ExceptionsScreen(apps: List<InstalledApp>, excluded: Set<String>, focus: Int
                 },
         ) {
             itemsIndexed(apps, key = { _, a -> a.packageName }) { i, app ->
-                ExcRow(app, app.packageName in excluded, i == focus)
+                AppRow(app, isOn(app.packageName), i + 1 == focus, onLabel, offLabel)
             }
         }
     }
 }
 
 @Composable
-private fun ExcRow(app: InstalledApp, excluded: Boolean, focused: Boolean) {
+private fun BulkButton(a: BulkAction, focused: Boolean) {
+    val accent = LocalAccent.current
+    val bg by animateColorAsState(if (focused) accent.base else Tokens.surface2, tween(140), label = "bb")
+    val fg by animateColorAsState(if (focused) accent.onDark else Tokens.text, tween(140), label = "bbf")
+    val (label, icon) = when (a) {
+        BulkAction.HIDE_ALL -> "Hide all" to R.drawable.ic_hide
+        BulkAction.SHOW_ALL -> "Show all" to R.drawable.ic_show
+        BulkAction.UNPIN_ALL -> "Unpin all" to R.drawable.ic_unpin
+    }
+    Row(
+        Modifier
+            .focusHalo(if (focused) 1f else 0f, 9.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(bg)
+            .border(1.dp, if (focused) accent.base else Tokens.line, RoundedCornerShape(9.dp))
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Image(painterResource(icon), null, colorFilter = ColorFilter.tint(fg), modifier = Modifier.size(15.dp))
+        Text(label, style = Type.label, color = fg, maxLines = 1)
+    }
+}
+
+@Composable
+private fun AppRow(app: InstalledApp, on: Boolean, focused: Boolean, onLabel: String, offLabel: String) {
     val accent = LocalAccent.current
     val f by animateFloatAsState(if (focused) 1f else 0f, tween(150, easing = Motion.standard), label = "exc")
-    val stateColor by animateColorAsState(if (excluded) accent.base else Tokens.textDim, tween(150), label = "excs")
+    val stateColor by animateColorAsState(if (on) accent.base else Tokens.textDim, tween(150), label = "excs")
     Row(
         Modifier
             .fillMaxWidth()
@@ -108,10 +173,10 @@ private fun ExcRow(app: InstalledApp, excluded: Boolean, focused: Boolean) {
         Text(app.label, style = Type.row, color = Tokens.text, maxLines = 1, textAlign = TextAlign.Right, modifier = Modifier.weight(1f))
         Text(app.tag, style = Type.small, color = Tokens.textDim, maxLines = 1)
         Text(
-            if (excluded) "Hidden from recents" else "Shown",
+            if (on) onLabel else offLabel,
             style = Type.small, color = stateColor, maxLines = 1, textAlign = TextAlign.Left,
             modifier = Modifier.widthIn(min = 120.dp),
         )
-        Toggle(on = excluded)
+        Toggle(on = on)
     }
 }

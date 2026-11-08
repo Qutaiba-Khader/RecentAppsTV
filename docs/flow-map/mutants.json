@@ -2,57 +2,50 @@
  {
   "id": "G-OK-scene",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
-  "replace": "k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null"
+  "find": "if (s.scene == Scene.OVERLAY && k.btn == Btn.OK) {",
+  "replace": "if (k.btn == Btn.OK) {"
  },
  {
   "id": "G-OK-btn",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
-  "replace": "s.scene == Scene.OVERLAY && !s.gear && !s.busy && !s.killing && s.flying == null"
- },
- {
-  "id": "G-OK-gear",
-  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
-  "replace": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.busy && !s.killing && s.flying == null"
+  "find": "if (s.scene == Scene.OVERLAY && k.btn == Btn.OK) {",
+  "replace": "if (s.scene == Scene.OVERLAY) {"
  },
  {
   "id": "G-OK-busy",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
-  "replace": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.killing && s.flying == null"
+  "find": "if (s.busy || s.killing || s.flying != null) return s.copy(pressing = false, longPress = s.longPress && k.down) to emptyList()",
+  "replace": "if (s.killing || s.flying != null) return s.copy(pressing = false, longPress = s.longPress && k.down) to emptyList()"
  },
  {
   "id": "G-OK-killing",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
-  "replace": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && s.flying == null"
+  "find": "if (s.busy || s.killing || s.flying != null) return s.copy(pressing = false, longPress = s.longPress && k.down) to emptyList()",
+  "replace": "if (s.busy || s.flying != null) return s.copy(pressing = false, longPress = s.longPress && k.down) to emptyList()"
  },
  {
   "id": "G-OK-flying",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
-  "replace": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing"
+  "find": "if (s.busy || s.killing || s.flying != null) return s.copy(pressing = false, longPress = s.longPress && k.down) to emptyList()",
+  "replace": "if (s.busy || s.killing) return s.copy(pressing = false, longPress = s.longPress && k.down) to emptyList()"
  },
  {
   "id": "G-HOLD-repeat",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "if (k.repeat == 1 && !s.isKillAllAt(s.focus)",
-  "replace": "if (!s.isKillAllAt(s.focus)"
+  "find": "if (k.repeat == 1 && card) {",
+  "replace": "if (card) {"
  },
  {
-  "id": "G-HOLD-killall",
+  "id": "G-HOLD-card",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": "k.repeat == 1 && !s.isKillAllAt(s.focus) && s.taskAt",
-  "replace": "k.repeat == 1 && s.taskAt",
-  "redundant": "isKillAllAt(focus) holds only at index 0 with Kill All shown, where taskAt(0) is null, so the taskAt condition already refuses the menu; kept as the readable intent"
+  "find": "if (k.repeat == 1 && card) {",
+  "replace": "if (k.repeat == 1) {"
  },
  {
-  "id": "G-HOLD-task",
+  "id": "G-HOLD-release",
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
-  "find": " && s.taskAt(s.focus) != null) {",
-  "replace": ") {"
+  "find": "val closed = s.copy(ctxPkg = null, longPress = true)",
+  "replace": "val closed = s.copy(ctxPkg = null, longPress = false)"
  },
  {
   "id": "G-INPUT-busy",
@@ -71,6 +64,42 @@
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
   "find": "if (s.busy || s.killing || s.flying != null) return s to emptyList()",
   "replace": "if (s.busy || s.killing) return s to emptyList()"
+ },
+ {
+  "id": "G-INPUT-selecting",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.closing || s.selecting != null) return s to emptyList()",
+  "replace": "if (s.closing) return s to emptyList()"
+ },
+ {
+  "id": "G-DISMISS-task",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "val item = s.focusedItem as? Item.Task ?: return s",
+  "replace": "val item = s.focusedItem ?: return s"
+ },
+ {
+  "id": "G-DISMISS-same",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "return if (s.peek == dir) s.copy(peek = PEEK_NONE, flying",
+  "replace": "return if (s.peek != PEEK_NONE) s.copy(peek = PEEK_NONE, flying"
+ },
+ {
+  "id": "G-ROW-pinned",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "by lazy { all.filter { it.pkg !in pinned } }",
+  "replace": "by lazy { all }"
+ },
+ {
+  "id": "G-ROW-killall",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "val hasKillAll get() = showKillAll && tasks.isNotEmpty()",
+  "replace": "val hasKillAll get() = tasks.isNotEmpty()"
+ },
+ {
+  "id": "G-ROW-empty",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.tasks.isEmpty() && s.pins.isEmpty()) return s.copy(scene = Scene.EMPTY",
+  "replace": "if (s.tasks.isEmpty()) return s.copy(scene = Scene.EMPTY"
  },
  {
   "id": "G-SELECT-id",

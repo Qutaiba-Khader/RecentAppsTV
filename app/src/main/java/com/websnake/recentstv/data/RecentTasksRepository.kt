@@ -58,16 +58,24 @@ class RecentTasksRepository(private val context: Context) {
         )
     }
 
-    /** Filter, then attach labels and pre-rasterised icons, one app per IO thread. */
-    suspend fun resolve(raw: List<TaskRef>, exceptions: Set<String>): List<RecentTask> = coroutineScope {
-        TaskList.select(raw, excluded = { pkg ->
+    /** The row's apps: running tasks (filtered) and the pinned apps, with labels and icons. */
+    data class Resolved(val all: List<RecentTask>, val pins: List<RecentTask>)
+
+    /** Filter, then attach labels, pre-rasterised icons and colours, one app per IO thread. */
+    suspend fun resolve(raw: List<TaskRef>, exceptions: Set<String>, pinned: List<String>): Resolved = coroutineScope {
+        val selected = TaskList.select(raw, excluded = { pkg ->
             pkg in skipPackages || TaskList.isHome(pkg, homePackages) || pkg in exceptions || !pkgRepo.isUsable(pkg)
-        }).map { t ->
-            async(Dispatchers.IO) {
-                val (label, category) = pkgRepo.labelAndCategory(t.pkg)
-                RecentTask(t.taskId, t.pkg, label, pkgRepo.icon(t.pkg), category)
-            }
-        }.awaitAll()
+        })
+        val all = selected.map { t -> async(Dispatchers.IO) { describe(t.pkg, t.taskId) } }
+        val pins = pinned.filter { it !in exceptions && it !in skipPackages }.map { p ->
+            async(Dispatchers.IO) { if (pkgRepo.isUsable(p)) describe(p, selected.firstOrNull { it.pkg == p }?.taskId) else null }
+        }
+        Resolved(all.awaitAll(), pins.awaitAll().filterNotNull())
+    }
+
+    private fun describe(pkg: String, taskId: Int?): RecentTask {
+        val (label, category) = pkgRepo.labelAndCategory(pkg)
+        return RecentTask(taskId, pkg, label, pkgRepo.icon(pkg), category, pkgRepo.brand(pkg))
     }
 
     // ── binder read ──────────────────────────────────────────────────────
@@ -92,7 +100,7 @@ class RecentTasksRepository(private val context: Context) {
 
     // ── actions ──────────────────────────────────────────────────────────
     /** Bring an existing task to the front. False → caller launches via intent. */
-    fun switchTo(task: RecentTask): Boolean {
+    fun switchTo(pkg: String, taskId: Int): Boolean {
         if (!ready()) return false
         // moveTaskToFront(IApplicationThread, String, int taskId, int flags, Bundle) — signatures
         // vary across ROMs: taskId goes in the first int slot, 0/null everywhere else.
@@ -103,14 +111,14 @@ class RecentTasksRepository(private val context: Context) {
             } ?: return@runCatching false
             var firstInt = true
             val args = m.parameterTypes.map { p ->
-                if (p == Int::class.javaPrimitiveType) (if (firstInt) task.taskId else 0).also { firstInt = false }
+                if (p == Int::class.javaPrimitiveType) (if (firstInt) taskId else 0).also { firstInt = false }
                 else nullFor(p)
             }.toTypedArray()
             m.invoke(atm, *args)
             true
         }.getOrDefault(false)
         if (moved) return true
-        return execShell("monkey -p ${task.packageName} -c android.intent.category.LEANBACK_LAUNCHER 1")
+        return execShell("monkey -p $pkg -c android.intent.category.LEANBACK_LAUNCHER 1")
             .contains("Events injected")
     }
 

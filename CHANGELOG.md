@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2 — 2026-11-08
+- Design update "Recent Apps TV 2": pinned apps (group, badge, running dot, left/right, small/same size, list with Unpin
+  all, empty-with-pins), select zoom on OK (tile → full screen in the app colour + name, then the app opens), balloon
+  hold-OK menu (Pin/Unpin, Add to exceptions, App info, Settings) with toast, ↑ or ↓ twice to remove, centred header
+  with counts, footer key hints, backgrounds Dim / Blur / Colour / Image, Exceptions Hide all / Show all, settings in
+  four sections.
+- Fixed: the name under the focused card blinked out and back on every left/right move (now a per-card cross-fade,
+  whole-pixel motion); OK opened the app with no visible animation; an OK in the hold menu could also open the app on
+  release; a release during an animation could eat the next OK.
+- Tests: 122, 100 % lines and branches, 25 of 25 gate mutants caught.
+
 ## 1.1 — 2026-11-08
 - Claude Design "Recent Apps TV" applied in full: RTL layout, focus ring + glow, name under the focused app, tinted
   Kill-all tile, settings/exceptions/Shizuku screens, motion spec (scrim fade, rise-in, focus glide, gap closing,

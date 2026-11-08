@@ -60,4 +60,19 @@ class GeometryTest {
         val l = Geometry.layout(listOf(100f), 20f, 30f)
         assertEquals(l.total / 2f, l.center(-1), eps)
     }
+
+    @Test fun `P-GEO-11 per-gap layout - the pinned group packs tighter inside, wider at its edges`() {
+        val g = Geometry.groupGaps(listOf(true, true, false, false), gap = 20f, inner = 16f, groupPad = 17f)
+        assertEquals(listOf(16f, 37f, 20f), g)
+        val l = Geometry.layout(listOf(50f, 50f, 100f, 100f), g, 10f)
+        assertEquals(10f, l.lefts[0], eps); assertEquals(76f, l.lefts[1], eps); assertEquals(163f, l.lefts[2], eps); assertEquals(283f, l.lefts[3], eps)
+        assertEquals(393f, l.total, eps)
+        assertEquals(listOf(37f), Geometry.groupGaps(listOf(false, true), 20f, 16f, 17f))
+        assertEquals(emptyList<Float>(), Geometry.groupGaps(emptyList(), 20f, 16f, 17f))
+    }
+
+    @Test fun `P-GEO-12 a gap list shorter than the items counts the missing gaps as 0`() {
+        val l = Geometry.layout(listOf(10f, 10f, 10f), listOf(5f), 0f)
+        assertEquals(15f, l.lefts[1], eps); assertEquals(25f, l.lefts[2], eps)
+    }
 }

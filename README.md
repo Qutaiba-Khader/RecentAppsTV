@@ -11,15 +11,27 @@ The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root
 
 <table>
 <tr>
-<td><img src="docs/screenshots/kill-all.jpg" alt="Kill all focused"><br><sub><b>Kill all</b> — clears every recent app</sub></td>
-<td><img src="docs/screenshots/dismiss-peek.jpg" alt="Remove one app"><br><sub><b>Down</b> — the card steps down: press again to remove</sub></td>
+<td><img src="docs/screenshots/select.jpg" alt="Opening an app"><br><sub><b>OK</b> — the tile grows to full screen in the app's colour, then the app opens</sub></td>
+<td><img src="docs/screenshots/pinned.jpg" alt="Pinned apps"><br><sub><b>Pinned apps</b> — always in the row, running or not</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/settings.jpg" alt="Settings"><br><sub><b>Settings</b> — size, shape, colours, dim, exceptions</sub></td>
-<td><img src="docs/screenshots/exceptions.jpg" alt="Exceptions"><br><sub><b>Exceptions</b> — hide apps from the list</sub></td>
+<td><img src="docs/screenshots/menu.jpg" alt="Hold OK menu"><br><sub><b>Hold OK</b> — pin, hide, app info, settings</sub></td>
+<td><img src="docs/screenshots/dismiss-peek.jpg" alt="Remove one app"><br><sub><b>↑ or ↓ twice</b> — the card steps aside, the second press sends it off</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/empty.jpg" alt="No recent apps"><br><sub><b>Empty</b> — nothing to show</sub></td>
+<td><img src="docs/screenshots/kill-all.jpg" alt="Kill all focused"><br><sub><b>Kill all</b> — clears running apps; pins stay</sub></td>
+<td><img src="docs/screenshots/empty-with-pins.jpg" alt="Only pins"><br><sub><b>Nothing running</b> — your pins are still one press away</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/settings.jpg" alt="Settings"><br><sub><b>Settings</b> — overlay, pinned apps, background, hidden apps</sub></td>
+<td><img src="docs/screenshots/settings-pinned.jpg" alt="Pinned settings"><br><sub><b>Pins</b> — which end of the row, and how big</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/background-color.jpg" alt="Colour background"><br><sub><b>Background</b> — dim, blur, a colour…</sub></td>
+<td><img src="docs/screenshots/background-image.jpg" alt="Image background"><br><sub>…or your own picture</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/exceptions.jpg" alt="Exceptions"><br><sub><b>Exceptions</b> — hide apps; Hide all / Show all</sub></td>
 <td><img src="docs/screenshots/shizuku-gate.jpg" alt="Shizuku needed"><br><sub><b>Shizuku</b> — shown until the service runs and access is granted</sub></td>
 </tr>
 </table>
@@ -31,36 +43,40 @@ The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root
 | Key | In the list |
 |---|---|
 | **← / →** | move between apps (→ goes toward newer apps and **Kill all**) |
-| **OK** | switch to that app · on **Kill all**: clear everything |
-| **Hold OK** | menu: *Add to exceptions* · *Kill app* · *App info* |
-| **↓** then **↓** | remove that app (first press lifts the card down with a hint, second press sends it off) |
-| **↑** | cancel a pending remove · otherwise jump to the ⚙ settings button |
-| **Back** | close (the app underneath carries on) |
+| **OK** | open that app · on **Kill all**: clear running apps (pins stay) |
+| **Hold OK** | menu: *Pin to row / Unpin* · *Add to exceptions* · *App info* · *Settings* |
+| **↑ ↑** or **↓ ↓** | remove that app (first press lifts the card with a hint, second press sends it off) — pinned apps can't be removed this way |
+| **Back** | close the menu, or close the list (the app underneath carries on) |
 | **Menu** | settings |
 
-In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The screen reads right-to-left as in the design.
+In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The screen reads right-to-left as in the design; *Pinned
+position* and the colour swatches read left-to-right (→ means Right). On *Pinned apps* and *Exceptions*, **↑** from the
+first row reaches the *Unpin all* / *Hide all* / *Show all* buttons.
 
-## What's new in 1.1
+## What's new in 1.2
 
-- **The new design, fully applied** — the right-to-left layout, the green focus ring with its glow, the name under the
-  focused app, the tinted Kill-all tile, and the Settings / Exceptions / Shizuku screens.
-- **Smooth animations everywhere**: the screen fades in and the row rises into place, focus glides, cards close the gap
-  when one is removed, the removed card falls away with a light trail, Kill all sends the cards up one after another,
-  and Back fades out instead of cutting.
-- **Opens faster.** After the first time it no longer starts from scratch (it steps aside instead of closing), so the
-  backdrop starts fading in at once and the apps are ready **0.05–0.09 s** later. Measured from the launch request,
-  reopening shows the apps in **0.28–0.36 s** instead of 0.38–0.45 s. A cold start (after Android has cleared the app
-  from memory) stays about the same, ~0.8 s.
-- **Smoother**: on the same D-pad test, slow frames dropped from 53–60 % to about 37 %, the median frame from 17–18 ms to
-  14 ms, and the GPU time per frame from 14 ms to 11 ms.
-- **Costs nothing while closed** — no service, no timers, no background work: 10 ms of CPU in 2 minutes,
-  zero wake-ups, zero frames drawn, and less memory held (40 MB instead of 64 MB).
-- **Install and update with ObtainX or Obtainium** (links below).
-- **Fixes**: text was drawn in the thinnest weight of the font (now the design's weights); OK sometimes did nothing
-  right after using the hold-OK menu; pressing OK while a removed card was still leaving switched to that app;
-  volume keys now work while the list is open; the app is 1.2 MB instead of 6.1 MB.
+- **Opening an app is animated.** Press OK: the tile presses in, grows to full screen in the app's own colour with its
+  name, and the app opens out of it. In 1.1 the app was opened at the same moment, which hid the short zoom and looked
+  like a freeze.
+- **No more flicker when moving left / right.** The app name under the focused card used to vanish and reappear on every
+  move; now each card carries its own name and the two names cross-fade, and the row moves in whole pixels so text
+  never shimmers.
+- **Pinned apps** — pin any app (hold OK → *Pin to row*, or Settings → *Pinned apps*). Pins always show, running or not,
+  in their own group with a pin badge and a dot when running; at the far end (default) or next to Kill all; small or
+  task-sized. Kill all leaves them. With nothing running they still show, beside a "No recent apps" note.
+- **Background** — *Dim* (with its strength), *Blur* (Android 12+ devices that support it), a *Colour* (5 swatches) or
+  your own *Image* (picked with the remote from device storage).
+- **New hold-OK menu**: a balloon above the app — Pin / Unpin, Add to exceptions, App info, Settings — with the row
+  sliding down beneath it and a confirmation toast.
+- **Remove with ↑ or ↓** — twice in the same direction.
+- **Exceptions**: *Hide all* / *Show all*, and a count. **Pinned apps list** with *Unpin all*.
+- Footer hints, centred header with "7 apps · 3 pinned".
+- **Fixes**: an OK pressed in the hold menu could also open the app under it when released (also in 1.1, after *Add to
+  exceptions*); a release during an animation could leave the next OK ignored.
+- Same speed and same zero cost while closed: reopening shows the apps in 0.30–0.37 s, a cold start in 0.52–0.61 s
+  (1.1: ~0.8 s); hidden for a minute: 0 wake-ups, 40 MB.
 
-Measured on a Samsung Galaxy A50 (Android 11), same test for both versions — see [docs/TESTING.md](docs/TESTING.md).
+Measured on a Samsung Galaxy A50 (Android 11) — see [docs/TESTING.md](docs/TESTING.md).
 
 ## Install and update with ObtainX or Obtainium
 
@@ -76,7 +92,7 @@ the app and keep it updated from this repo's releases:
 - **On the TV** (usually no browser): in ObtainX or Obtainium choose **Add app** and enter
   `https://github.com/Qutaiba-Khader/RecentAppsTV`, then **Add** and **Install**.
 - **Updates:** each new release here (a `v1.2`-style tag with the APK attached) shows up as an update in the app.
-  The installed version (`1.1`) and the release tag (`v1.1`) are read as the same version, so no false updates.
+  The installed version (`1.2`) and the release tag (`v1.2`) are read as the same version, so no false updates.
 - Already added before? The link only opens the existing entry. Remove it first to re-add it with these settings.
 
 <details><summary>Raw link (for ObtainX → Import from URL list, or to share)</summary>
@@ -116,9 +132,9 @@ All privileged work sits in `RecentTasksRepository`, through the Shizuku shell i
 | Action | How |
 |---|---|
 | read | the root-task list over the binder (`getAllRootTaskInfos`, or `getAllStackInfos` on Android 10–11) — the same data `am stack list` prints, without starting a process; falls back to `am stack list`, then `dumpsys activity recents` |
-| switch | `IActivityTaskManager.moveTaskToFront`, else the app's launch intent |
+| switch | after the select zoom: `IActivityTaskManager.moveTaskToFront`, else the app's launch intent (a pinned app that isn't running) |
 | remove | force-stop (optional), then `removeTask` for **every** task of that app |
-| kill all | the same for every app shown |
+| kill all | the same for every running app shown (pins included); the pins stay in the row |
 
 Everything that decides what you see — the key handling, the task filtering, the settings rules, the row geometry —
 is plain Kotlin in `logic/`, with no Android types, so it is tested on the computer (below).
@@ -126,8 +142,8 @@ is plain Kotlin in `logic/`, with no Android types, so it is tested on the compu
 ```
 com.websnake.recentstv
 ├─ logic/        Overlay (keys → state + effects), TaskList, Settings, SettingsNav, Geometry   ← fully tested
-├─ data/         RecentTasksRepository (Shizuku), PackageRepository (icons + labels, cached), SettingsStore
-├─ ui/           theme, overlay row, context menu, settings, empty and Shizuku screens
+├─ data/         RecentTasksRepository (Shizuku), PackageRepository (icons, labels, colours, cached), SettingsStore, BackdropImage
+├─ ui/           theme, overlay row + pins, select zoom, hold menu, toast, settings + app lists, empty and Shizuku screens
 ├─ RecentsActivity   the overlay window: runs the effects, never finishes (steps aside → instant reopen)
 └─ SettingsActivity
 ```
@@ -139,8 +155,8 @@ Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every c
 ## Tests — the flow map
 
 The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
-fails the build on any line or branch that no test runs. 96 tests, 100 % of lines and branches; the critical conditions
-are mutation-tested (each one is removed in a copy and a test must fail: 19 of 19 caught).
+fails the build on any line or branch that no test runs. 122 tests, 100 % of lines and branches; the critical conditions
+are mutation-tested (each one is removed in a copy and a test must fail: 25 of 25 caught).
 
 ```bash
 ./gradlew :app:testDebugUnitTest                 # the tests

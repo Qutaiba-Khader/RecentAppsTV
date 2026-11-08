@@ -19,7 +19,6 @@ import com.websnake.recentstv.R
 import com.websnake.recentstv.logic.Accent
 import com.websnake.recentstv.logic.CardShape
 import com.websnake.recentstv.logic.CardSize
-import com.websnake.recentstv.logic.Tint
 
 /**
  * Design tokens lifted verbatim from the prototype's tv/styles.css.
@@ -122,11 +121,11 @@ val Accent.color: Color get() = when (this) {
     Accent.AMBER -> Color(0xFFF2A93B); Accent.PINK -> Color(0xFFEC4899)
 }
 
-/** Settings · Background colour (scrim tint). */
-val Tint.color: Color get() = when (this) {
-    Tint.BLACK -> Color(0xFF000000); Tint.CHARCOAL -> Color(0xFF0A0B0D)
-    Tint.NAVY -> Color(0xFF0A1428); Tint.GREY -> Color(0xFF181A1E)
-}
+/** Settings · Background colour swatches (drawn at 94 % alpha), in [Settings.bgColor] order. */
+val BackdropSwatches = listOf(
+    "Graphite" to Color(0xFF12151A), "Midnight" to Color(0xFF0B1733), "Forest" to Color(0xFF0A2619),
+    "Plum" to Color(0xFF24112F), "Black" to Color(0xFF000000),
+)
 
 /** Motion spec from the design (README §6). */
 object Motion {
@@ -139,7 +138,14 @@ object Motion {
     const val KILL_STAGGER_MS = 28
     const val KILL_TO_EMPTY_MS = 520
     const val EXIT_MS = 170
-    const val LAUNCH_MS = 190
+    const val PRESS_SCALE = 1.06f      // OK held down (press-in feedback)
+    const val PRESS_MS = 120
+    const val SELECT_MS = 500          // tile → full screen zoom
+    const val SELECT_HOLD_MS = 400     // name visible before handing off to the app
+    const val CHROME_FADE_MS = 220     // row / header / footer fade when an app is chosen
+    val selectEasing = androidx.compose.animation.core.CubicBezierEasing(0.65f, 0f, 0.25f, 1f)
+    const val MENU_SHIFT_MS = 300      // row slides down while the long-press menu is open
+    const val TOAST_MS = 1800
     const val FOCUS_SCALE = 1.15f
     const val KILL_FOCUS_SCALE = 1.10f
     const val IDLE_SCALE = 0.90f

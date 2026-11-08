@@ -191,7 +191,7 @@ Weights: 800 (titles), 700 (labels/rows), 500 (descriptions).
 
 - Translucent dialog over the running app. Scrim ~66% black (system dim), faint blur.
 - A **single horizontal row** of **icon-only** app cards, **vertically centered**. No thumbnails/snapshots — **app icon only** (use the real launcher icon from `PackageManager.getApplicationIcon`).
-- **Header (top):** title "Recent apps" (start/right), and a task count on the opposite side (LTR text).
+- **Header (top, centered):** "Recent apps" title with the count line centered under it (e.g. "7 apps · 3 pinned", LTR text).
 - **Card:** rounded container holding the app icon at `--card-size`. Drop shadow `0 18px 40px -16px rgba(0,0,0,.7)`.
 - **Focused card (the critical cue):**
   - scales to **1.15×**,
@@ -270,6 +270,44 @@ Persist all of this in **DataStore** (`SettingsStore`). The overlay reads these 
 
 ---
 
+### Surface 5 — PINNED APPS (new)
+Screens **07, 08, 09, 11, 14, 15**.
+- Users can pin any installed app. Pinned apps **always appear in the row**, running or not, grouped in a subtle rounded container labelled **"Pinned"** with a pin icon.
+- A pinned app that is also running appears **once**, in the pinned group, with a small **running dot** under it (hidden when focused). It is removed from the normal task list.
+- **Pinned position** setting: **Left (default)** = far (end) side of the RTL row, after the oldest task. **Right** = immediately next to Kill All, before task #1.
+- **Pinned icon size** setting: **Small (default)** = 72% of the task card size · **Same as tasks**.
+- Pinned cards carry a small **pin badge** on their top corner so they read differently from tasks.
+- Pinned cards ignore UP/DOWN (they can't be swiped away). OK opens them: `moveTaskToFront` if running, otherwise launch the package's leanback launch intent.
+- **Kill All** removes tasks only. Pins stay.
+- **Pinned apps list** (Settings → Pinned apps): same layout as Exceptions, toggle = pinned, a bulk **Unpin all** button. Pin order is the order the user pinned them in.
+- Persist `pinned: List<String>` (ordered), `pinPosition`, `pinSize` in DataStore.
+
+### Surface 6 — LONG-PRESS OK MENU (new)
+Screens **05, 06**.
+- **Holding OK ≥ 550 ms** on any task or pinned card opens a **balloon menu above that card**, with a downward tip pointing at it. A short press still opens the app (fire on KeyUp, not KeyDown).
+- While open, the row slides down 18% of the screen height (97dp), the other cards and Kill All dim to ~32%, and the focused card's name label and the footer hints hide.
+- Header: small app icon, app name, status line ("Pinned · Running" / "Running" / "Not running").
+- Items (UP/DOWN to move, OK to run, BACK to close, LEFT/RIGHT do nothing):
+  1. **Pin to row** / **Unpin**
+  2. **Add to exceptions**: the card flies up and is hidden from the overlay. A toast confirms it.
+  3. **App info**: opens `Settings.ACTION_APPLICATION_DETAILS_SETTINGS` for the package and closes the overlay.
+- Focused item = solid accent fill + dark text (same as other TV buttons).
+- A white pill toast near the bottom confirms each action (~1.8 s).
+
+### Surface 7 — EXCEPTIONS: BULK ACTIONS (new)
+Screens **16, 17, 18**.
+- A bar above the list holds **Hide all** (exclude every installed app) and **Show all** (clear the exceptions), plus a count, e.g. "1 of 12 hidden".
+- The bar is reached with UP from the first row. LEFT/RIGHT move between the buttons.
+- If everything is hidden and nothing is pinned, the overlay shows the Empty state.
+
+### Surface 4b — EMPTY WITH PINS (new)
+Screen **11**: no running tasks but some pins. Kill All is hidden. In place of the tasks, a dashed placeholder reads **"No recent apps / Pinned apps are still one press away."** The pinned group stays focusable. The full Empty state (screen 10) shows only when there are no tasks **and** no pins.
+
+### Overlay footer (new)
+Key hints along the bottom of the overlay: **OK** Open · **Hold OK** Options · **↑ ↓** Twice to remove · **Back** Close. They hide while the menu is open and in the Empty state.
+
+---
+
 ## 5. State & data
 - **SettingsStore (DataStore):** `showKillAll: Boolean = true`, `size: enum{SMALL,MEDIUM,LARGE}=MEDIUM`,
   `shape: enum{SQUARE,ROUNDED,CIRCLE}=ROUNDED`, `exceptions: Set<String>` (package names).
@@ -302,56 +340,57 @@ Persist all of this in **DataStore** (`SettingsStore`). The overlay reads these 
 - [ ] DPAD L/R focus, **OK** switches task, **OK** on Kill All clears all → Empty.
 - [ ] **UP/DOWN** = two-stage D-pad swipe-to-dismiss removing a single task; mid-dismiss state rendered.
 - [ ] **BACK** closes overlay.
-- [ ] Settings: Show Kill All toggle, Size (S/M/L scales cards), Shape (Sq/Rounded/Circle + live preview), Exceptions list with per-app toggles — all persisted.
+- [ ] Settings: Overlay (Show Kill All, Size, Shape) · Pinned apps (list, Position, Icon size) · Hidden apps (Exceptions) — all persisted.
 - [ ] **Shizuku** gate state when not running / not granted, with working **grant** action; overlay only renders when ready.
 - [ ] **Empty** state with Kill All hidden.
 - [ ] **No** trigger/"how to open" setting. Overlay launchable via exported `RecentsActivity` + static & dynamic **shortcut**; component name documented.
+- [ ] Pinned apps: group + badge + running dot; Left (default) / Right position; Small (default) / Same size; Kill All keeps pins; Pinned apps list with Unpin all.
+- [ ] Hold OK ≥550ms opens the balloon menu (Pin/Unpin, Add to exceptions, App info); a short press still opens the app.
+- [ ] Exceptions: Hide all / Show all bulk bar + count.
+- [ ] Empty with pins (screen 11) vs full Empty (screen 10).
 - [ ] Everything reachable by **D-pad only**; focus is the strongest visual cue on every screen.
 
 ---
 
 ## 8. Files in this bundle
 
-### Screenshots (`screenshots/`, 1920×1080)
-| File | Screen | Compose source |
-|---|---|---|
-| `01-overlay.png` | Overlay, focus on task #1 | `screens/RecentsScreen.kt`, `components/Overlay.kt › TaskCard` |
-| `02-overlay-killall-focus.png` | Kill All focused | `components/Overlay.kt › KillAllTile` |
-| `03-dismiss-peek.png` | Dismiss stage 1 (peek) | `TaskCard` (Peek.UP) |
-| `04-dismiss-midflight.png` | Dismiss stage 2 (flying off) | `TaskCard` (flying) |
-| `05-empty.png` | Empty | `components/Overlay.kt › EmptyRecents` |
-| `06-settings.png` | Settings | `screens/SettingsScreen.kt` |
-| `07-settings-shape-circle.png` | Shape = Circle | `SettingsScreen` + `ShapePreview` |
-| `08-exceptions.png` | Exceptions list | `screens/ExceptionsScreen.kt` |
-| `09-shizuku-gate.png` | Shizuku required | `screens/ShizukuGateScreen.kt` |
-| `_contact-sheet.png` | All 9 on one sheet | — |
+### Screenshots (`screenshots/`, 1920×1080) — `00-all-screens.png` shows all 27
+01 overlay · 02 Kill All focused · 03 dismiss peek · 04 dismiss mid-flight · 05 hold-OK menu (task) · 06 hold-OK menu (pinned) · 07 pinned left (default) · 08 pinned right · 09 pinned same size · 10 empty · 11 empty with pins · 12 settings · 13 shape = circle · 14 settings, pinned section · 15 pinned apps list · 16 exceptions · 17 exceptions bulk · 18 exceptions all hidden · 19 Shizuku gate · 20 select press · 21 select zooming · 22 select full · 23 settings background color · 24 background blur · 25 background color · 26 background image · 27 settings background image.
 
-### Jetpack Compose UI (`compose/`) — Compose for TV (`androidx.tv:tv-material`)
-- `theme/Color.kt` · `Type.kt` · `Dimens.kt` (sizes, shapes, motion) · `Theme.kt` (`RecentsTheme`, forces RTL) · `Focus.kt` (`Modifier.focusRing`)
-- `components/Overlay.kt` — `TaskCard`, `KillAllTile`, `EmptyRecents`, `LaunchFlash`
-- `components/Settings.kt` — `SettingsRow`, `RecentsToggle`, `Segmented`, `ShapePreview`, `RecentsButton`
-- `screens/` — `RecentsScreen`, `SettingsScreen`, `ExceptionsScreen`, `ShizukuGateScreen`
-- `model/UiModels.kt` — `RecentTask`, `InstalledApp`, `SettingsState`, `RecentsUiState`
-- `RecentsActivity.kt` — dialog-window host wiring the states
-- `res/values/themes.xml` (translucent overlay theme, dim 0.66) · `res/drawable/ic_clear_all.xml`, `ic_shield_check.xml`
+The header ("Recent apps" + count) is **centered** on every overlay screen.
 
-Units: HTML px ÷ 2 = dp/sp (1080p TV = 960×540 dp). `RecentsViewModel`, `RecentTasksRepository`, `ShizukuManager`, `SettingsStore` are specified in §2/§5 but not written — build them.
+### Jetpack Compose (`compose/`) — Compose for TV, Kotlin
+Copy `compose/*.kt` into `app/src/main/java/app/recents/tv/` (keep sub-folders as packages) and `compose/res/` into `app/src/main/res/`. Merge `AndroidManifest.xml` and `build.gradle.kts`.
 
-Dependencies: `androidx.tv:tv-material`, `androidx.compose.ui:ui-text-google-fonts`, `androidx.activity:activity-compose`, `androidx.datastore:datastore-preferences`, `dev.rikka.shizuku:api` + `:provider`.
+| File | What it is |
+|---|---|
+| `theme/Color.kt` · `Type.kt` · `Dimens.kt` · `Theme.kt` · `Focus.kt` | Tokens, type scale, sizes/shapes/motion enums, `RecentsTheme` (forces RTL), `Modifier.focusRing` |
+| `components/Overlay.kt` | `TaskCard` (focus, two-stage dismiss, hold-OK), `KillAllTile`, `EmptyRecents` |
+| `components/Pins.kt` | `PinnedGroup`, `PinBadge`, `RunningDot`, `EmptyRecentsSlot` |
+| `components/ContextMenu.kt` | `TaskContextMenu` balloon (Popup anchored above the card) |
+| `components/SelectZoom.kt` | Tile → full-screen select animation |
+| `components/Background.kt` | Dim / Blur / Color / Image backdrop + window flags |
+| `components/Settings.kt` | `SettingsRow`, `RecentsToggle`, `Segmented`, `ShapePreview`, `RecentsButton` |
+| `screens/RecentsScreen.kt` | Overlay screen (01–11, 20–22, 24–26) |
+| `screens/SettingsScreen.kt` | Settings (12–14, 23, 27) |
+| `screens/ExceptionsScreen.kt` | `ExceptionsScreen` + `PinnedAppsScreen` with bulk bars (15–18) |
+| `screens/ShizukuGateScreen.kt` | Permission gate (19) |
+| `model/UiModels.kt` | `RecentTask`, `InstalledApp`, `SettingsState`, `TaskAction`, `RecentsUiState` |
+| `data/Contracts.kt` | Interfaces to implement: `ShizukuManager`, `RecentTasksRepository`, `AppCatalog`, `SettingsStore`, `BackgroundImageLoader` + `Graph` |
+| `RecentsViewModel.kt` | Combines Shizuku state, tasks, pins, settings → `RecentsUiState`; all actions |
+| `RecentsActivity.kt` | Dialog-style overlay host |
+| `SettingsActivity.kt` | Settings host: Settings → Pinned apps / Exceptions, image picker |
+| `RecentsApp.kt` | Application: wire `Graph`, publish dynamic shortcut |
+| `preview/SampleData.kt` · `Previews.kt` | `@Preview` for every screen at 1080p TV, using the prototype's sample apps |
+| `AndroidManifest.xml` | Activities, LEANBACK_LAUNCHER, `SHOW_RECENTS` action, Shizuku provider |
+| `res/xml/shortcuts.xml` · `res/values/strings.xml` · `res/values/themes.xml` · `res/drawable/*` | Static shortcuts, strings, overlay theme (dim 0.66), icons, banner |
+| `build.gradle.kts` | Required dependencies |
+
+**Still to implement (Claude Code):** the five interfaces in `data/Contracts.kt`, then uncomment the wiring in `RecentsApp.kt`. Add Manrope TTFs to `res/font/` (see `Type.kt`).
+
+Units: HTML px ÷ 2 = dp/sp (1080p TV = 960×540 dp).
 
 ### Design reference
-- `design_reference/Recent Apps TV.html` — the interactive prototype (open in a browser; use the scene
-  picker below the TV frame and arrow keys / Enter / Esc to explore all four surfaces and the dismiss flow).
-- `design_reference/tv/styles.css` — all tokens, type scale, component styling, motion.
-- `design_reference/tv/app.js` — focus engine, carousel clamp, two-stage dismiss, kill-all, scene routing.
-- `design_reference/tv/data.js` — placeholder app set + icon glyphs (replace with real `PackageManager` data).
-
-> The prototype's colored "app icons" and the faux "running app" backdrop are **placeholders**. In the real
-> app, icons come from the system and the backdrop is literally whatever app is running beneath the dialog.
-```
-First steps for Claude Code:
-1. Scaffold the Kotlin TV app (leanback), add Shizuku api+provider, set up the dialog-themed RecentsActivity + manifest intent-filter + shortcuts.xml.
-2. Build ShizukuManager + the Shizuku gate (Surface 3).
-3. Implement RecentTasksRepository (read/switch/dismiss/killAll via Shizuku) behind a stub for previews.
-4. Build the RTL carousel + focus engine to match Surface 1, then Settings (Surface 2) + Empty (Surface 4).
-```
+- `design_reference/Recent Apps TV.html` — interactive prototype (arrow keys, Enter, hold Enter, Esc).
+- `design_reference/All Screens.html` — every screen and state on one page.
+- `design_reference/tv/` — styles, logic and sample data behind the prototype.

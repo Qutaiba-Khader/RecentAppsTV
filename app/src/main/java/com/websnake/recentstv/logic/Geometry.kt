@@ -10,12 +10,31 @@ class StripLayout(val lefts: FloatArray, val widths: FloatArray, val total: Floa
 object Geometry {
 
     /** Items laid left→right with [gap] between them and [pad] at both ends. */
-    fun layout(widths: List<Float>, gap: Float, pad: Float): StripLayout {
+    fun layout(widths: List<Float>, gap: Float, pad: Float): StripLayout =
+        layout(widths, List((widths.size - 1).coerceAtLeast(0)) { gap }, pad)
+
+    /** Items laid left→right; [gaps]`[i]` sits between item i and i+1 (the pinned group packs tighter). */
+    fun layout(widths: List<Float>, gaps: List<Float>, pad: Float): StripLayout {
         val lefts = FloatArray(widths.size)
         var x = pad
-        widths.forEachIndexed { i, w -> lefts[i] = x; x += w + if (i < widths.lastIndex) gap else 0f }
+        widths.forEachIndexed { i, w -> lefts[i] = x; x += w + if (i < widths.lastIndex) (gaps.getOrNull(i) ?: 0f) else 0f }
         return StripLayout(lefts, widths.toFloatArray(), x + pad)
     }
+
+    /**
+     * Gaps for a row whose items are flagged [grouped] (pinned): [inner] between two grouped
+     * items, [gap] + [groupPad] where the group meets a neighbour (room for the group's frame),
+     * [gap] elsewhere.
+     */
+    fun groupGaps(grouped: List<Boolean>, gap: Float, inner: Float, groupPad: Float): List<Float> =
+        (0 until (grouped.size - 1).coerceAtLeast(0)).map { i ->
+            val a = grouped[i]; val b = grouped[i + 1]
+            when {
+                a && b -> inner
+                a || b -> gap + groupPad
+                else -> gap
+            }
+        }
 
     /**
      * Strip translation that centres item [focus] in a [viewport]-wide window.

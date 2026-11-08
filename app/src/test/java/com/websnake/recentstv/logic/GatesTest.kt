@@ -1,6 +1,7 @@
 package com.websnake.recentstv.logic
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,44 +14,41 @@ class GatesTest {
 
     private val a = TaskRef(11, "app.a")
     private val b = TaskRef(12, "app.b")
-    private fun ready(vararg t: TaskRef) = Overlay.loaded(OvState(), t.toList(), true)
+    private fun ready(vararg t: TaskRef, pins: List<String> = emptyList()) = Overlay.loaded(OvState(), t.toList(), pins, true, false)
     private fun press(s: OvState, btn: Btn, repeat: Int = 0) = Overlay.key(s, KeyIn(btn, true, repeat))
     private fun release(s: OvState, btn: Btn) = Overlay.key(s, KeyIn(btn, false))
 
     // ── G-OK: who handles OK (tap on release / hold for the menu) ──
     @Test fun `G-OK-scene only the overlay scene takes the tap-hold path`() {
         assertEquals(listOf(Effect.OpenSettings), press(ready(), Btn.OK).second)        // Empty: acts on press
+        assertTrue(press(ready(a), Btn.OK).second.isEmpty())                            // overlay: waits for the release
     }
 
     @Test fun `G-OK-btn other keys never enter the OK path`() {
         assertEquals(2, press(ready(a, b), Btn.LEFT).first.focus)
     }
 
-    @Test fun `G-OK-gear with the gear focused OK acts on press`() {
-        val g = press(ready(a), Btn.UP).first
-        assertEquals(listOf(Effect.OpenSettings), press(g, Btn.OK).second)
-    }
-
     @Test fun `G-OK-busy a hold while switching opens no menu`() {
-        assertNull(press(ready(a).copy(busy = true), Btn.OK, 1).first.ctxTaskId)
-        assertEquals(11, press(ready(a), Btn.OK, 1).first.ctxTaskId)
+        assertNull(press(ready(a).copy(busy = true), Btn.OK, 1).first.ctxPkg)
+        assertEquals("app.a", press(ready(a), Btn.OK, 1).first.ctxPkg)
     }
 
     @Test fun `G-OK-killing a hold during Kill All opens no menu`() {
-        assertNull(press(ready(a).copy(killing = true), Btn.OK, 1).first.ctxTaskId)
+        assertNull(press(ready(a).copy(killing = true), Btn.OK, 1).first.ctxPkg)
     }
 
     @Test fun `G-OK-flying a hold during a fly-off opens no menu`() {
-        assertNull(press(ready(a, b).copy(flying = 12), Btn.OK, 1).first.ctxTaskId)
+        assertNull(press(ready(a, b).copy(flying = "app.b"), Btn.OK, 1).first.ctxPkg)
     }
 
     // ── G-HOLD: when a held OK opens the context menu ──
     @Test fun `G-HOLD-repeat the first press of OK opens nothing`() {
-        assertNull(press(ready(a), Btn.OK, 0).first.ctxTaskId)
+        assertNull(press(ready(a), Btn.OK, 0).first.ctxPkg)
     }
 
-    @Test fun `G-HOLD-task a hold with no task under focus opens nothing`() {
-        assertNull(press(ready(a).copy(focus = 7), Btn.OK, 1).first.ctxTaskId)
+    @Test fun `G-HOLD-card a hold on Kill All opens nothing, on a pin it does`() {
+        assertNull(press(ready(a).copy(focus = 0), Btn.OK, 1).first.ctxPkg)
+        assertEquals("p.x", press(ready(pins = listOf("p.x")), Btn.OK, 1).first.ctxPkg)
     }
 
     // ── G-INPUT: the overlay ignores input while it is changing ──
@@ -62,9 +60,43 @@ class GatesTest {
         assertEquals(PEEK_NONE, press(ready(a, b).copy(killing = true), Btn.DOWN).first.peek)
     }
 
-    @Test fun `G-INPUT-flying no gear jump during a fly-off`() {
-        assertTrue(!press(ready(a, b).copy(flying = 11), Btn.UP).first.gear)
-        assertTrue(press(ready(a, b), Btn.UP).first.gear)
+    @Test fun `G-INPUT-flying no peek during a fly-off`() {
+        assertEquals(PEEK_NONE, press(ready(a, b).copy(flying = "app.b"), Btn.UP).first.peek)
+        assertEquals(PEEK_UP, press(ready(a, b), Btn.UP).first.peek)
+    }
+
+    @Test fun `G-INPUT-selecting the select zoom swallows every key`() {
+        val s = ready(a, b).copy(selecting = "app.a")
+        assertEquals(s, press(s, Btn.LEFT).first)
+        assertEquals(2, press(ready(a, b), Btn.LEFT).first.focus)
+    }
+
+    // ── G-DISMISS: only a running task can be swiped away ──
+    @Test fun `G-DISMISS-task a pin never peeks, a task does`() {
+        assertEquals(PEEK_NONE, press(ready(a, pins = listOf("p.x")).copy(focus = 2), Btn.DOWN).first.peek)
+        assertEquals(PEEK_DOWN, press(ready(a, pins = listOf("p.x")), Btn.DOWN).first.peek)
+    }
+
+    @Test fun `G-DISMISS-same only the same direction twice flies the card`() {
+        assertNull(press(press(ready(a), Btn.UP).first, Btn.DOWN).first.flying)
+        assertEquals("app.a", press(press(ready(a), Btn.DOWN).first, Btn.DOWN).first.flying)
+    }
+
+    // ── G-ROW: who sits in the row ──
+    @Test fun `G-ROW-pinned a pinned running app leaves the tasks`() {
+        assertEquals(listOf(b), ready(a, b, pins = listOf("app.a")).tasks)
+    }
+
+    @Test fun `G-ROW-killall Kill All needs the setting and at least one task`() {
+        assertFalse(Overlay.loaded(OvState(), listOf(a), emptyList(), false, false).hasKillAll)
+        assertFalse(ready(pins = listOf("p.x")).hasKillAll)
+        assertTrue(ready(a).hasKillAll)
+    }
+
+    @Test fun `G-ROW-empty Empty only when there are neither tasks nor pins`() {
+        assertEquals(Scene.OVERLAY, ready(pins = listOf("p.x")).scene)
+        assertEquals(Scene.OVERLAY, ready(a).scene)
+        assertEquals(Scene.EMPTY, ready().scene)
     }
 
     // ── G-SELECT: which tasks the user sees ──
@@ -103,5 +135,11 @@ class GatesTest {
         val l = Geometry.layout(List(20) { 100f }, 20f, 30f)
         assertTrue(Geometry.stripOffset(1000f, l, 19) >= 1000f - l.total - 0.001f)
         assertTrue(Geometry.stripOffset(1000f, l, 0) <= 0.001f)
+    }
+
+    // the release that ends a hold must not open the app
+    @Test fun `G-HOLD-release the release after a hold opens nothing`() {
+        val held = press(ready(a), Btn.OK, 1).first
+        assertTrue(release(held, Btn.OK).second.isEmpty())
     }
 }
