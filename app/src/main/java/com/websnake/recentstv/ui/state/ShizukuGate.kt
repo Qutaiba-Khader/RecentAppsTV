@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
@@ -47,7 +48,14 @@ fun ShizukuGate(focus: Int) {
                     .background(Tokens.surface)
                     .border(1.dp, Tokens.line, RoundedCornerShape(18.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Text("🛡", style = Type.hero) }
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(com.websnake.recentstv.R.drawable.ic_shield_check),
+                    contentDescription = null,
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(accent.base),
+                    modifier = Modifier.size(40.dp),
+                )
+            }
 
             // permission-required pill
             Box(
@@ -55,11 +63,11 @@ fun ShizukuGate(focus: Int) {
                     .clip(RoundedCornerShape(percent = 50))
                     .background(accent.tint)
                     .padding(horizontal = 14.dp, vertical = 7.dp),
-            ) { Text("PERMISSION REQUIRED", style = Type.mono, color = accent.base) }
+            ) { Text("PERMISSION REQUIRED", style = Type.badge, color = accent.base) }
 
-            Text("Shizuku isn't running", style = Type.hero, color = Tokens.text, textAlign = TextAlign.Center)
+            Text("Shizuku isn’t running", style = Type.hero, color = Tokens.text, textAlign = TextAlign.Center)
             Text(
-                "This app reads the running task list through Shizuku. Start the Shizuku service and grant access to see your recent apps.",
+                "Recent Apps reads your task list through Shizuku. Start the Shizuku service and grant access, then return here to see your recent apps.",
                 style = Type.body, color = Tokens.textDim, textAlign = TextAlign.Center,
             )
 
@@ -67,8 +75,9 @@ fun ShizukuGate(focus: Int) {
                 Modifier.padding(top = 7.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                GateButton("Open Shizuku & grant", focused = focus == 0, primary = true)
+                // RTL (design): the primary button sits on the right, Retry to its left
                 GateButton("Retry", focused = focus == 1, primary = false)
+                GateButton("Open Shizuku & grant", focused = focus == 0, primary = true)
             }
         }
     }
@@ -77,10 +86,15 @@ fun ShizukuGate(focus: Int) {
 @Composable
 private fun GateButton(label: String, focused: Boolean, primary: Boolean) {
     val accent = LocalAccent.current
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, tween(160), label = "btn")
+    val scale by animateFloatAsState(if (focused) 1.04f else 1f, tween(160, easing = com.websnake.recentstv.ui.theme.Motion.standard), label = "btn")
     Box(
         Modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
+            .then(if (focused) Modifier.drawBehind {
+                drawRoundRect(accent.tint, topLeft = androidx.compose.ui.geometry.Offset(-2.5.dp.toPx(), -2.5.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(size.width + 5.dp.toPx(), size.height + 5.dp.toPx()),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(11.5.dp.toPx()))
+            } else Modifier)
             .clip(RoundedCornerShape(9.dp))
             .background(if (focused) accent.base else Tokens.surface2)
             .border(1.dp, if (focused) accent.base else Tokens.line, RoundedCornerShape(9.dp))

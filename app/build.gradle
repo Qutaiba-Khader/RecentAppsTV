@@ -12,17 +12,21 @@ android {
         applicationId "com.websnake.recentstv"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
     }
 
     buildTypes {
         release {
-            // No minification: privileged framework reflection (IActivityTaskManager,
-            // Shizuku) must not be stripped/renamed. Non-debuggable release dex is
-            // what makes Compose smooth on the TV GPU.
-            minifyEnabled false
+            // R8: Compose runs markedly faster optimised. Framework reflection targets
+            // boot-classpath classes (never renamed); Shizuku is kept by proguard-rules.pro.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.debug
+        }
+        debug {
+            enableUnitTestCoverage true   // JaCoCo XML for the flowmap gate
         }
     }
 
@@ -36,6 +40,7 @@ android {
     buildFeatures {
         compose true
     }
+
 }
 
 dependencies {
@@ -67,6 +72,11 @@ dependencies {
 
     // Hidden API blocklist bypass for privileged framework reflection
     implementation 'org.lsposed.hiddenapibypass:hiddenapibypass:4.3'
+
+    // Installs the bundled baseline profiles (Compose + app) so hot paths are AOT-compiled
+    implementation 'androidx.profileinstaller:profileinstaller:1.4.1'
+
+    testImplementation 'junit:junit:4.13.2'
 
     debugImplementation 'androidx.compose.ui:ui-tooling'
 }

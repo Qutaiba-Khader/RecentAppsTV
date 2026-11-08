@@ -1,0 +1,123 @@
+[
+ {
+  "id": "G-OK-scene",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
+  "replace": "k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null"
+ },
+ {
+  "id": "G-OK-btn",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
+  "replace": "s.scene == Scene.OVERLAY && !s.gear && !s.busy && !s.killing && s.flying == null"
+ },
+ {
+  "id": "G-OK-gear",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
+  "replace": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.busy && !s.killing && s.flying == null"
+ },
+ {
+  "id": "G-OK-busy",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
+  "replace": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.killing && s.flying == null"
+ },
+ {
+  "id": "G-OK-killing",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
+  "replace": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && s.flying == null"
+ },
+ {
+  "id": "G-OK-flying",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing && s.flying == null",
+  "replace": "s.scene == Scene.OVERLAY && k.btn == Btn.OK && !s.gear && !s.busy && !s.killing"
+ },
+ {
+  "id": "G-HOLD-repeat",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (k.repeat == 1 && !s.isKillAllAt(s.focus)",
+  "replace": "if (!s.isKillAllAt(s.focus)"
+ },
+ {
+  "id": "G-HOLD-killall",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "k.repeat == 1 && !s.isKillAllAt(s.focus) && s.taskAt",
+  "replace": "k.repeat == 1 && s.taskAt",
+  "redundant": "isKillAllAt(focus) holds only at index 0 with Kill All shown, where taskAt(0) is null, so the taskAt condition already refuses the menu; kept as the readable intent"
+ },
+ {
+  "id": "G-HOLD-task",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": " && s.taskAt(s.focus) != null) {",
+  "replace": ") {"
+ },
+ {
+  "id": "G-INPUT-busy",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.busy || s.killing || s.flying != null) return s to emptyList()",
+  "replace": "if (s.killing || s.flying != null) return s to emptyList()"
+ },
+ {
+  "id": "G-INPUT-killing",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.busy || s.killing || s.flying != null) return s to emptyList()",
+  "replace": "if (s.busy || s.flying != null) return s to emptyList()"
+ },
+ {
+  "id": "G-INPUT-flying",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (s.busy || s.killing || s.flying != null) return s to emptyList()",
+  "replace": "if (s.busy || s.killing) return s to emptyList()"
+ },
+ {
+  "id": "G-SELECT-id",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/TaskList.kt",
+  "find": "if (t.taskId <= 0 || t.pkg.isBlank() || t.pkg in seen) continue",
+  "replace": "if (t.pkg.isBlank() || t.pkg in seen) continue"
+ },
+ {
+  "id": "G-SELECT-blank",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/TaskList.kt",
+  "find": "if (t.taskId <= 0 || t.pkg.isBlank() || t.pkg in seen) continue",
+  "replace": "if (t.taskId <= 0 || t.pkg in seen) continue"
+ },
+ {
+  "id": "G-SELECT-seen",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/TaskList.kt",
+  "find": "if (t.taskId <= 0 || t.pkg.isBlank() || t.pkg in seen) continue",
+  "replace": "if (t.taskId <= 0 || t.pkg.isBlank()) continue"
+ },
+ {
+  "id": "G-SELECT-excluded",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/TaskList.kt",
+  "find": "if (excluded(t.pkg)) continue",
+  "replace": "if (false) continue"
+ },
+ {
+  "id": "G-READ-null",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/TaskList.kt",
+  "find": "if (b != null && b.size >= 2) return b to TaskSource.BINDER",
+  "replace": "if (b!!.size >= 2) return b to TaskSource.BINDER"
+ },
+ {
+  "id": "G-READ-size",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/TaskList.kt",
+  "find": "if (b != null && b.size >= 2) return b to TaskSource.BINDER",
+  "replace": "if (b != null) return b to TaskSource.BINDER"
+ },
+ {
+  "id": "G-CLAMP-fits",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Geometry.kt",
+  "find": "if (strip.total <= viewport) return",
+  "replace": "if (false) return"
+ },
+ {
+  "id": "G-CLAMP-ends",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Geometry.kt",
+  "find": ".coerceIn(viewport - strip.total, 0f)",
+  "replace": ""
+ }
+]

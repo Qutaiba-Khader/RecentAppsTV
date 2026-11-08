@@ -11,6 +11,8 @@ class RecentsApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.websnake.recentstv.data.SettingsStore.warm(this)      // start the async prefs loads now
+        com.websnake.recentstv.data.PackageRepository.warm(this)
         // Lift the hidden-API blocklist so privileged framework reflection
         // (IActivityTaskManager / IActivityManager) is permitted.
         if (Build.VERSION.SDK_INT >= 28) {

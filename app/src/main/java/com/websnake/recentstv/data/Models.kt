@@ -1,18 +1,16 @@
 package com.websnake.recentstv.data
 
-import android.graphics.drawable.Drawable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.ImageBitmap
 
-/** A single recent task surfaced in the overlay.
- *  @Immutable: the icon Drawable reference is treated as constant for a given
- *  task instance, letting Compose skip unchanged cards (the list is rebuilt, not
- *  mutated in place) — essential to avoid recomposing all cards on focus change. */
+/** A recent task ready to draw: the icon is already rasterised (off the UI thread),
+ *  so composing a card never decodes or scales a Drawable. */
 @Immutable
 data class RecentTask(
     val taskId: Int,
     val packageName: String,
     val label: String,
-    val icon: Drawable?,
+    val icon: ImageBitmap?,
     val category: String = "",
 )
 
@@ -21,6 +19,6 @@ data class RecentTask(
 data class InstalledApp(
     val packageName: String,
     val label: String,
-    val icon: Drawable?,
-    val tag: String,            // "System" / "App"
+    val icon: ImageBitmap?,
+    val tag: String,            // "System" / "App" / category
 )

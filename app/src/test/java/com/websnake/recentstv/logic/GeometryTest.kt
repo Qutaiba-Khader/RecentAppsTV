@@ -1,0 +1,63 @@
+package com.websnake.recentstv.logic
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+/** Area GEO — carousel positions, centring/clamp, keep-in-view, icon size (docs/flow-map/geometry.md). */
+class GeometryTest {
+
+    private val eps = 0.001f
+
+    @Test fun `P-GEO-01 layout places items with gap and end padding`() {
+        val l = Geometry.layout(listOf(100f, 100f, 134f), gap = 20f, pad = 30f)
+        assertEquals(30f, l.lefts[0], eps); assertEquals(150f, l.lefts[1], eps); assertEquals(270f, l.lefts[2], eps)
+        assertEquals(30f + 334f + 40f + 30f, l.total, eps)
+        assertEquals(337f, l.center(2), eps)
+    }
+
+    @Test fun `P-GEO-02 empty layout is just padding - out-of-range centre is the middle`() {
+        val l = Geometry.layout(emptyList(), 20f, 30f)
+        assertEquals(60f, l.total, eps); assertEquals(30f, l.center(3), eps)
+    }
+
+    @Test fun `P-GEO-03 a strip that fits is centred as a whole`() {
+        val l = Geometry.layout(listOf(100f, 100f), 20f, 30f)       // total 280
+        assertEquals((1000f - 280f) / 2f, Geometry.stripOffset(1000f, l, 0), eps)
+    }
+
+    @Test fun `P-GEO-04 a long strip centres the focused item`() {
+        val l = Geometry.layout(List(20) { 100f }, 20f, 30f)        // total 2440
+        assertEquals(500f - l.center(10), Geometry.stripOffset(1000f, l, 10), eps)
+    }
+
+    @Test fun `P-GEO-05 clamp - Kill All on the right never leaves the screen, nor the oldest on the left`() {
+        val l = Geometry.layout(List(20) { 100f }, 20f, 30f)
+        assertEquals(1000f - l.total, Geometry.stripOffset(1000f, l, 19), eps)    // right end pinned
+        assertEquals(0f, Geometry.stripOffset(1000f, l, 0), eps)                  // left end pinned
+    }
+
+    @Test fun `P-GEO-06 no viewport yet means no offset`() {
+        assertEquals(0f, Geometry.stripOffset(0f, Geometry.layout(listOf(100f), 20f, 30f), 0), eps)
+    }
+
+    @Test fun `P-GEO-07 revealDelta - visible needs nothing, above scrolls up, below scrolls down`() {
+        assertEquals(0f, Geometry.revealDelta(100f, 200f, 0f, 500f, 20f), eps)
+        assertEquals(-30f, Geometry.revealDelta(-10f, 90f, 0f, 500f, 20f), eps)
+        assertEquals(30f, Geometry.revealDelta(400f, 510f, 0f, 500f, 20f), eps)
+    }
+
+    @Test fun `P-GEO-08 revealDelta - a row taller than the window aligns its top`() {
+        assertEquals(80f, Geometry.revealDelta(100f, 900f, 0f, 500f, 20f), eps)
+    }
+
+    @Test fun `P-GEO-09 icon raster size covers the largest drawn size, bounded`() {
+        assertEquals(198, Geometry.iconRasterPx(115f, 0.66f, 1.3f, 2.0f))
+        assertEquals(48, Geometry.iconRasterPx(10f, 0.5f, 1f, 1f))
+        assertEquals(512, Geometry.iconRasterPx(500f, 1f, 2f, 4f))
+    }
+
+    @Test fun `P-GEO-10 a negative index also falls back to the middle`() {
+        val l = Geometry.layout(listOf(100f), 20f, 30f)
+        assertEquals(l.total / 2f, l.center(-1), eps)
+    }
+}

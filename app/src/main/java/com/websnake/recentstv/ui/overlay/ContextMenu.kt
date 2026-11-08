@@ -44,7 +44,7 @@ fun ContextMenu(task: RecentTask, selected: Int) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .widthIn(min = 360.dp)
+                .widthIn(min = 360.dp, max = 440.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(Tokens.surface)
                 .border(1.dp, Tokens.line, RoundedCornerShape(20.dp))
@@ -52,16 +52,10 @@ fun ContextMenu(task: RecentTask, selected: Int) {
         ) {
             // app header
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val painter = remember(task.packageName) {
-                    task.icon?.let {
-                        val w = it.intrinsicWidth.takeIf { v -> v > 0 } ?: 96
-                        val h = it.intrinsicHeight.takeIf { v -> v > 0 } ?: 96
-                        BitmapPainter(it.toBitmap(w, h).asImageBitmap())
-                    }
-                }
-                if (painter != null) {
+                val icon = task.icon
+                if (icon != null) {
                     Box(Modifier.size(44.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.card), Alignment.Center) {
-                        Image(painter, task.label, Modifier.size(34.dp), contentScale = ContentScale.Fit)
+                        Image(icon, task.label, Modifier.size(34.dp), contentScale = ContentScale.Fit)
                     }
                     Spacer(Modifier.width(16.dp))
                 }

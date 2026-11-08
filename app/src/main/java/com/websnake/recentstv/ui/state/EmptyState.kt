@@ -22,6 +22,11 @@ import com.websnake.recentstv.ui.theme.Type
 @Composable
 fun EmptyState() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // header as on the overlay (design 05): title at the right
+        Text(
+            "Recent apps", style = Type.title, color = Tokens.text,
+            modifier = Modifier.align(Alignment.TopEnd).padding(end = 104.dp, top = 47.dp),
+        )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),

@@ -1,0 +1,31 @@
+{
+  "name": "recentappstv",
+  "level": "full",
+  "source": [
+    "app/src/main/java/com/websnake/recentstv/logic/*.kt"
+  ],
+  "exclude": [
+    "**/src/test/**",
+    "tools/flow/**"
+  ],
+  "tests": [
+    "app/src/test/**/*.kt"
+  ],
+  "maps": "docs/flow-map",
+  "index": "docs/FLOW-MAP.md",
+  "lanes": [
+    {
+      "name": "jvm",
+      "adapter": "jacoco",
+      "command": "bash tools/flow/jvm-lane.sh",
+      "report": "app/build/reports/coverage/test/debug/report.xml",
+      "tests": [
+        "app/src/test/**/*.kt"
+      ]
+    }
+  ],
+  "codebase_memory": {
+    "project": "recentappstv"
+  },
+  "notes": "JVM lane runs in CT 200 (Gradle + SDK live there) on the shared folder. Scope = the pure logic package; the Android glue (Activities, Shizuku repository, composables) is exercised by the A50 device run, a separate step."
+}

@@ -1,165 +1,101 @@
 package com.websnake.recentstv.data
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import com.websnake.recentstv.logic.TaskList
+import com.websnake.recentstv.logic.TaskRef
+import com.websnake.recentstv.logic.TaskSource
 import com.websnake.recentstv.shizuku.ShizukuManager
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuBinderWrapper
 import rikka.shizuku.SystemServiceHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.lang.reflect.Method
 
 /**
- * Reads and mutates the system recent-task list through Shizuku-elevated
- * privileged binder calls, behind a clean interface so the UI never touches
- * Shizuku directly (and so it can be stubbed for previews).
+ * Reads and changes the system task list through Shizuku, behind one interface so
+ * the UI never touches Shizuku directly.
  *
- *  - read    : IActivityTaskManager.getRecentTasks(...)  → dumpsys parse fallback
- *  - switch  : IActivityTaskManager.moveTaskToFront(...)  → launch-intent fallback (caller)
- *  - dismiss : IActivityTaskManager.removeTask(taskId)    → forceStopPackage fallback
- *  - killAll : removeTask per task                        → forceStop per task fallback
+ *  - read    : root-task infos over the binder (what `am stack list` prints, without
+ *              spawning a process) → `am stack list` → `dumpsys activity recents`
+ *  - switch  : IActivityTaskManager.moveTaskToFront → monkey launch (caller adds intent fallback)
+ *  - dismiss : force-stop (optional) + removeTask for every task of the package
+ *  - killAll : the same for every shown package
+ *
+ * Note: as the Shizuku *shell* identity the privileged getRecentTasks returns only the
+ * caller's own task (shell lacks REAL_GET_TASKS); root-task infos need only
+ * MANAGE_ACTIVITY_TASKS, which shell holds.
  */
 class RecentTasksRepository(private val context: Context) {
 
-    private companion object { const val MAX_TASKS = 12 }
-
     private val pkgRepo = PackageRepository(context)
-    private val ownPackage = context.packageName
+    private val skipPackages = setOf(context.packageName, "com.android.systemui", ShizukuManager.SHIZUKU_PKG)
 
-    private val skipPackages = setOf(
-        ownPackage,
-        "com.android.systemui",
-        ShizukuManager.SHIZUKU_PKG,
-    )
-    private val launcherHints = listOf(
-        "com.google.android.tvlauncher",
-        "com.google.android.apps.tv.launcherx",
-        "com.google.android.leanbacklauncher",
-        "com.android.launcher",
-    )
-
-    // packages that register as a HOME/launcher — never shown as a "recent app"
     private val homePackages: Set<String> by lazy {
         runCatching {
-            val intent = android.content.Intent(android.content.Intent.ACTION_MAIN)
-                .addCategory(android.content.Intent.CATEGORY_HOME)
-            context.packageManager.queryIntentActivities(intent, 0)
-                .mapTo(HashSet()) { it.activityInfo.packageName }
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            context.packageManager.queryIntentActivities(intent, 0).mapTo(HashSet()) { it.activityInfo.packageName }
         }.getOrDefault(emptySet())
     }
 
-    private fun isHome(pkg: String) =
-        pkg in homePackages || launcherHints.any { pkg.startsWith(it) }
-
-    /** True when Shizuku is alive AND granted. */
     fun ready(): Boolean = ShizukuManager.state().ready
 
-    // ── reading ──────────────────────────────────────────────────────────
-    fun getRecentTasks(exceptions: Set<String>): List<RecentTask> {
-        if (!ready()) return emptyList()
-        // The privileged getRecentTasks binder call returns only the CALLER's own
-        // task under the Shizuku shell identity (shell lacks REAL_GET_TASKS), so it
-        // is useless for enumeration here. The shell `am stack list` / `dumpsys`
-        // run as shell and see every task — use them as the source of truth.
-        val raw = runCatching { readViaShell() }.getOrDefault(emptyList())
-        Log.i("RecentsRepo", "read ${raw.size} tasks via shell")
-        return raw
-            .filter { (taskId, pkg) ->
-                taskId > 0 && pkg.isNotBlank() && pkg !in skipPackages && !isHome(pkg) &&
-                    pkg !in exceptions && pkgRepo.isUsable(pkg)   // drop disabled/uninstalled
-            }
-            .distinctBy { it.second }            // collapse multi-task same-package
-            .take(MAX_TASKS)                      // cap composition cost on TV
-            .map { (taskId, pkg) ->
-                RecentTask(
-                    taskId = taskId,
-                    packageName = pkg,
-                    label = pkgRepo.label(pkg),
-                    icon = pkgRepo.icon(pkg),
-                    category = pkgRepo.category(pkg),
-                )
-            }
-    }
-
-    /** Primary read path: privileged IActivityTaskManager.getRecentTasks. */
-    private fun readViaBinder(): List<Pair<Int, String>> {
-        val atm = activityTaskManager() ?: return emptyList()
-        // getRecentTasks(int maxNum, int flags, int userId) → ParceledListSlice
-        val m = atm.javaClass.getMethod(
-            "getRecentTasks", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
+    /** Raw ordered task list (front first) and where it came from. */
+    fun readRaw(): Pair<List<TaskRef>, TaskSource> {
+        if (!ready()) return emptyList<TaskRef>() to TaskSource.NONE
+        homePackages        // resolve the launcher set here, in parallel with the settings read
+        return TaskList.read(
+            binder = { runCatching { readViaBinder() }.getOrNull() },
+            stackList = { execShell("am stack list") },
+            dumpsys = { execShell("dumpsys activity recents") },
         )
-        val slice = m.invoke(atm, 50, 0, 0) ?: return emptyList()
-        val list = slice.javaClass.getMethod("getList").invoke(slice) as? List<*> ?: return emptyList()
-        val out = ArrayList<Pair<Int, String>>()
-        for (info in list) {
-            if (info == null) continue
-            val taskId = readIntField(info, "taskId", "persistentId")
-            val pkg = readPackageFromTaskInfo(info)
-            if (pkg != null) out.add(taskId to pkg)
-        }
-        return out
     }
 
-    private fun readPackageFromTaskInfo(info: Any): String? {
-        (readField(info, "baseActivity") as? ComponentName)?.let { return it.packageName }
-        (readField(info, "topActivity") as? ComponentName)?.let { return it.packageName }
-        (readField(info, "realActivity") as? ComponentName)?.let { return it.packageName }
-        (readField(info, "baseIntent") as? Intent)?.component?.let { return it.packageName }
-        return null
-    }
-
-    /**
-     * Read the task list as the Shizuku shell. Prefer the small/fast `am stack
-     * list` output; fall back to the heavier `dumpsys activity recents` (full MRU)
-     * only if that yields nothing.
-     */
-    private fun readViaShell(): List<Pair<Int, String>> {
-        val fast = ArrayList<Pair<Int, String>>()
-        Regex("taskId=(\\d+): ([\\w.]+)/").findAll(execShell("am stack list")).forEach {
-            fast.add(it.groupValues[1].toInt() to it.groupValues[2])
-        }
-        if (fast.size >= 2) return fast
-        return readViaDumpsys()
-    }
-
-    private fun readViaDumpsys(): List<Pair<Int, String>> {
-        val out = ArrayList<Pair<Int, String>>()
-        val text = execShell("dumpsys activity recents")
-        // split into "* Recent #N:" blocks, MRU order
-        val blocks = text.split(Regex("\\* Recent #\\d+:"))
-        val idRe = Regex("Task\\{[0-9a-fA-F]+ #(\\d+)")
-        val affRe = Regex("A=\\d+:([\\w.]+)")
-        val realRe = Regex("realActivity=([\\w.]+)/")
-        val cmpRe = Regex("baseIntent=.*?cmp=([\\w.]+)/")
-        for (b in blocks.drop(1)) {
-            val taskId = idRe.find(b)?.groupValues?.get(1)?.toIntOrNull()
-                ?: Regex("#(\\d+)").find(b)?.groupValues?.get(1)?.toIntOrNull() ?: -1
-            val pkg = affRe.find(b)?.groupValues?.get(1)
-                ?: realRe.find(b)?.groupValues?.get(1)
-                ?: cmpRe.find(b)?.groupValues?.get(1)
-            if (pkg != null) out.add(taskId to pkg)
-        }
-        if (out.isEmpty()) {
-            // last resort: `am stack list`
-            val sl = execShell("am stack list")
-            Regex("taskId=(\\d+): ([\\w.]+)/").findAll(sl).forEach {
-                out.add(it.groupValues[1].toInt() to it.groupValues[2])
+    /** Filter, then attach labels and pre-rasterised icons, one app per IO thread. */
+    suspend fun resolve(raw: List<TaskRef>, exceptions: Set<String>): List<RecentTask> = coroutineScope {
+        TaskList.select(raw, excluded = { pkg ->
+            pkg in skipPackages || TaskList.isHome(pkg, homePackages) || pkg in exceptions || !pkgRepo.isUsable(pkg)
+        }).map { t ->
+            async(Dispatchers.IO) {
+                val (label, category) = pkgRepo.labelAndCategory(t.pkg)
+                RecentTask(t.taskId, t.pkg, label, pkgRepo.icon(t.pkg), category)
             }
+        }.awaitAll()
+    }
+
+    // ── binder read ──────────────────────────────────────────────────────
+    private var rootTasksMethod: Method? = null
+
+    private fun readViaBinder(): List<TaskRef>? {
+        val atm = activityTaskManager() ?: return null
+        val m = rootTasksMethod ?: (
+            runCatching { atm.javaClass.getMethod("getAllRootTaskInfos") }.getOrNull()      // Android 12+
+                ?: runCatching { atm.javaClass.getMethod("getAllStackInfos") }.getOrNull()  // Android 10–11
+            )?.also { rootTasksMethod = it } ?: return null
+        val list = m.invoke(atm) as? List<*> ?: return null
+        val roots = list.filterNotNull().map { info ->
+            // Android 12+ RootTaskInfo: childTaskIds/childTaskNames; Android 10–11 StackInfo: taskIds/taskNames
+            val ids = (readField(info, "childTaskIds") ?: readField(info, "taskIds")) as? IntArray
+            @Suppress("UNCHECKED_CAST")
+            val names = (readField(info, "childTaskNames") ?: readField(info, "taskNames")) as? Array<String?>
+            ids to names
         }
-        return out
+        return TaskList.fromRootTasks(roots)
     }
 
     // ── actions ──────────────────────────────────────────────────────────
-    /** Bring an existing task to the front. Returns false → caller should launch via intent. */
+    /** Bring an existing task to the front. False → caller launches via intent. */
     fun switchTo(task: RecentTask): Boolean {
         if (!ready()) return false
-        // reflection moveTaskToFront(IApplicationThread, String, int taskId, int flags, Bundle)
-        // — a null caller/options works for a privileged binder. Signatures vary across
-        // ROMs, so resolve dynamically: taskId goes in the first int slot, 0 in any other.
+        // moveTaskToFront(IApplicationThread, String, int taskId, int flags, Bundle) — signatures
+        // vary across ROMs: taskId goes in the first int slot, 0/null everywhere else.
         val moved = runCatching {
             val atm = activityTaskManager() ?: return@runCatching false
             val m = atm.javaClass.methods.firstOrNull {
@@ -174,52 +110,38 @@ class RecentTasksRepository(private val context: Context) {
             true
         }.getOrDefault(false)
         if (moved) return true
-        // shell fallback: monkey-launch by package (resumes existing task in most cases)
-        val ok = execShell("monkey -p ${task.packageName} -c android.intent.category.LEANBACK_LAUNCHER 1")
+        return execShell("monkey -p ${task.packageName} -c android.intent.category.LEANBACK_LAUNCHER 1")
             .contains("Events injected")
-        return ok
     }
 
-    /** Remove a recent entry. Apps can own SEVERAL tasks, so remove every task
-     *  for the package (else the app re-appears from a sibling task). Optionally
-     *  force-stop the app so it can't immediately recreate its task. */
-    fun dismiss(task: RecentTask, forceStop: Boolean): Boolean {
+    /** Remove a recent entry: every task of the package (else it reappears from a
+     *  sibling task), force-stopping first so the app can't recreate them. */
+    fun dismiss(taskId: Int, pkg: String, forceStop: Boolean): Boolean {
         if (!ready()) return false
-        // Force-stop FIRST so the app can't recreate its tasks while we remove them.
-        if (forceStop) forceStop(task.packageName)
-        val ids = allTaskIdsForPackage(task.packageName).ifEmpty { listOf(task.taskId) }
+        if (forceStop) forceStop(pkg)
         var ok = false
-        for (id in ids) if (removeTaskViaBinder(id)) ok = true
+        for (id in TaskList.idsFor(readRaw().first, pkg, taskId)) if (removeTask(id)) ok = true
         return ok
     }
 
-    fun killAll(tasks: List<RecentTask>, forceStop: Boolean) {
+    fun killAll(pkgs: Set<String>, forceStop: Boolean) {
         if (!ready()) return
-        val pkgs = tasks.mapTo(HashSet()) { it.packageName }
         if (forceStop) for (p in pkgs) forceStop(p)
-        val all = runCatching { readViaShell() }.getOrDefault(emptyList())
-        for ((id, pkg) in all) if (pkg in pkgs) removeTaskViaBinder(id)
+        for ((id, pkg) in readRaw().first) if (pkg in pkgs) removeTask(id)
     }
 
-    private fun allTaskIdsForPackage(pkg: String): List<Int> =
-        runCatching { readViaShell() }.getOrDefault(emptyList())
-            .filter { it.second == pkg }.map { it.first }
-
-    /** Privileged removeTask — the Shizuku shell identity holds REMOVE_TASKS. */
-    private fun removeTaskViaBinder(taskId: Int): Boolean = runCatching {
+    private fun removeTask(taskId: Int): Boolean = runCatching {
         val atm = activityTaskManager() ?: return false
-        val m = atm.javaClass.getMethod("removeTask", Int::class.javaPrimitiveType)
-        val r = m.invoke(atm, taskId)
-        Log.i("RecentsRepo", "removeTask($taskId)=$r")
+        val r = atm.javaClass.getMethod("removeTask", Int::class.javaPrimitiveType).invoke(atm, taskId)
+        Log.i(TAG, "removeTask($taskId)=$r")
         (r as? Boolean) ?: true
     }.getOrElse {
-        Log.w("RecentsRepo", "removeTask($taskId) failed: ${it.message}")
+        Log.w(TAG, "removeTask($taskId) failed: ${it.message}")
         false
     }
 
-    /** Force-stop the app. Tries the privileged binder first, then ALWAYS runs the
-     *  shell `am force-stop` (the Shizuku shell holds FORCE_STOP_PACKAGES) so the
-     *  process is reliably killed regardless of reflection quirks. */
+    /** Privileged binder first, then ALWAYS the shell `am force-stop` (shell holds
+     *  FORCE_STOP_PACKAGES) so the process is reliably killed. */
     private fun forceStop(pkg: String) {
         runCatching {
             activityManager()?.let { iam ->
@@ -227,16 +149,15 @@ class RecentTasksRepository(private val context: Context) {
                     .invoke(iam, pkg, 0)
             }
         }
-        val out = execShell("am force-stop $pkg")
-        Log.i("RecentsRepo", "force-stop $pkg -> ${out.ifBlank { "ok" }.trim()}")
+        execShell("am force-stop $pkg")
     }
 
-    // ── privileged binder handles ────────────────────────────────────────
-    private fun activityTaskManager(): Any? = runCatching {
+    // ── privileged binder handles (cached per process) ───────────────────
+    private fun activityTaskManager(): Any? = atm ?: runCatching {
         val stub = Class.forName("android.app.IActivityTaskManager\$Stub")
         val asInterface: Method = stub.getMethod("asInterface", IBinder::class.java)
         asInterface.invoke(null, ShizukuBinderWrapper(SystemServiceHelper.getSystemService("activity_task")))
-    }.getOrNull()
+    }.getOrNull()?.also { atm = it }
 
     private fun activityManager(): Any? = runCatching {
         val stub = Class.forName("android.app.IActivityManager\$Stub")
@@ -244,25 +165,15 @@ class RecentTasksRepository(private val context: Context) {
         asInterface.invoke(null, ShizukuBinderWrapper(SystemServiceHelper.getSystemService("activity")))
     }.getOrNull()
 
-    // ── reflection helpers ───────────────────────────────────────────────
     private fun readField(obj: Any, name: String): Any? = runCatching {
-        val f = findField(obj.javaClass, name) ?: return null
-        f.isAccessible = true
-        f.get(obj)
-    }.getOrNull()
-
-    private fun readIntField(obj: Any, vararg names: String): Int {
-        for (n in names) (readField(obj, n) as? Int)?.let { return it }
-        return -1
-    }
-
-    private fun findField(start: Class<*>, name: String): java.lang.reflect.Field? {
-        var c: Class<*>? = start
+        var c: Class<*>? = obj.javaClass
         while (c != null) {
-            try { return c.getDeclaredField(name) } catch (_: NoSuchFieldException) { c = c.superclass }
+            try {
+                val f = c.getDeclaredField(name); f.isAccessible = true; return f.get(obj)
+            } catch (_: NoSuchFieldException) { c = c.superclass }
         }
-        return null
-    }
+        null
+    }.getOrNull()
 
     private fun nullFor(p: Class<*>): Any? = when (p) {
         Int::class.javaPrimitiveType -> 0
@@ -276,19 +187,19 @@ class RecentTasksRepository(private val context: Context) {
             "newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java
         )
         newProcess.isAccessible = true
-        // Redirect stderr so a chatty command can't fill the pipe and deadlock waitFor().
-        val process = newProcess.invoke(
-            null, arrayOf("sh", "-c", "$command 2>/dev/null"), null, null
-        ) as Process
-        val reader = BufferedReader(InputStreamReader(process.inputStream))
-        try {
-            val sb = StringBuilder()
-            var line: String?
-            while (reader.readLine().also { line = it } != null) sb.append(line).append('\n')
+        // stderr dropped so a chatty command can't fill the pipe and deadlock waitFor()
+        val process = newProcess.invoke(null, arrayOf("sh", "-c", "$command 2>/dev/null"), null, null) as Process
+        BufferedReader(InputStreamReader(process.inputStream)).use { r ->
+            val text = r.readText()
             process.waitFor()
-            sb.toString()
-        } finally {
-            reader.close()
+            text
         }
-    }.getOrElse { Log.w("RecentsRepo", "shell failed: ${it.message}"); "" }
+    }.getOrElse { Log.w(TAG, "shell failed: ${it.message}"); "" }
+
+    companion object {
+        const val TAG = "RTV"
+        // The binder proxy dies with Shizuku; dropped when its binder dies (see ShizukuManager).
+        @Volatile private var atm: Any? = null
+        fun dropBinders() { atm = null }
+    }
 }

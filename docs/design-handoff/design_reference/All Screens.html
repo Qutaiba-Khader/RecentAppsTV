@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recent Apps TV · All Screens</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+body{background:#050506;color:#f3f5f7;font-family:Manrope,sans-serif;padding:32px 24px 64px}
+a{color:#3DDC84}a:hover{color:#2fc973}
+h1{font-size:28px;font-weight:800;margin-bottom:6px}
+.sub{color:#9aa0a8;font-size:15px;margin-bottom:28px}
+h2{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#3DDC84;margin:36px 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:24px}
+figure{display:flex;flex-direction:column;gap:10px}
+.frame{aspect-ratio:16/9;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.08);background:#000}
+.frame iframe{width:100%;height:100%;border:0;display:block}
+figcaption{display:flex;gap:10px;align-items:baseline;font-size:15px;font-weight:700}
+figcaption span{color:#5e646c;font-weight:700;font-size:13px}
+figcaption em{font-style:normal;color:#9aa0a8;font-weight:500;font-size:14px}
+</style>
+</head>
+<body>
+<h1>Recent Apps · Android TV</h1>
+<div class="sub">All screens and states. Open <a href="Recent Apps TV.html">the prototype</a> to navigate with arrow keys, Enter and Esc.</div>
+<h2>1 · Recent apps overlay</h2>
+<div class="grid">
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=overlay" loading="lazy"></iframe></div><figcaption><span>01</span>Default <em>Focus on most recent task</em></figcaption></figure>
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=killall" loading="lazy"></iframe></div><figcaption><span>02</span>Kill All focused</figcaption></figure>
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=peek" loading="lazy"></iframe></div><figcaption><span>03</span>Dismiss · peek <em>First UP press</em></figcaption></figure>
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=dismiss" loading="lazy"></iframe></div><figcaption><span>04</span>Dismiss · flying off <em>Second UP press</em></figcaption></figure>
+</div>
+<h2>2 · Settings</h2>
+<div class="grid">
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=settings" loading="lazy"></iframe></div><figcaption><span>06</span>Settings</figcaption></figure>
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=circle" loading="lazy"></iframe></div><figcaption><span>07</span>Shape = Circle <em>Live preview</em></figcaption></figure>
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=exceptions" loading="lazy"></iframe></div><figcaption><span>08</span>Exceptions list</figcaption></figure>
+</div>
+<h2>3 · States</h2>
+<div class="grid">
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=shizuku" loading="lazy"></iframe></div><figcaption><span>09</span>Shizuku not running</figcaption></figure>
+<figure><div class="frame"><iframe src="Recent Apps TV.html?frame=empty" loading="lazy"></iframe></div><figcaption><span>05</span>Empty</figcaption></figure>
+</div>
+</body>
+</html>

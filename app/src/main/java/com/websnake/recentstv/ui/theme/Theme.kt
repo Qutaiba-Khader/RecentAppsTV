@@ -5,15 +5,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.darkColorScheme
 import com.websnake.recentstv.R
+import com.websnake.recentstv.logic.Accent
+import com.websnake.recentstv.logic.CardShape
+import com.websnake.recentstv.logic.CardSize
+import com.websnake.recentstv.logic.Tint
 
 /**
  * Design tokens lifted verbatim from the prototype's tv/styles.css.
@@ -41,6 +47,9 @@ object Tokens {
     val accentTint = Color(0x243DDC84)   // ~0.14 alpha
     val accentGlow = Color(0x8C3DDC84)   // ~0.55 alpha
     val accentOnDark = Color(0xFF08210F) // dark text on solid-accent fills
+    val track = Color(0xFF2B2F36)
+    val knob = Color(0xFF6B7280)
+    val segBg = Color(0xFF16181C)
     val killGlyphOnFocus = Color(0xFF0A2417)
 
     // scrim — the system dim provides the real 0.66 scrim; this is a light top-up
@@ -56,61 +65,85 @@ object Tokens {
     val tMono = 11.sp
 }
 
-// Single variable Manrope TTF; the renderer applies the requested weight axis.
-private val manrope = FontFamily(
-    Font(R.font.manrope, FontWeight.Medium),
-    Font(R.font.manrope, FontWeight.Bold),
-    Font(R.font.manrope, FontWeight.ExtraBold),
+// Manrope ships as ONE variable TTF whose default instance is weight 200 (ExtraLight).
+// Each weight must set the wght axis explicitly, or every style renders ExtraLight.
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+private fun manropeAt(w: Int) = Font(
+    R.font.manrope, FontWeight(w),
+    variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(
+        androidx.compose.ui.text.font.FontVariation.weight(w)
+    ),
 )
 
+private val manrope = FontFamily(manropeAt(500), manropeAt(600), manropeAt(700), manropeAt(800))
+
+/** English runs stay LTR inside the RTL screens, so punctuation and digits keep their place. */
 object Type {
-    val hero = TextStyle(fontFamily = manrope, fontWeight = FontWeight.ExtraBold, fontSize = Tokens.tHero)
-    val title = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tTitle)
-    val row = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tRow)
-    val label = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tLabel)
-    val body = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Medium, fontSize = Tokens.tBody)
-    val small = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Medium, fontSize = Tokens.tSmall)
-    val mono = TextStyle(fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tMono)
+    val hero = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.ExtraBold, fontSize = Tokens.tHero, letterSpacing = (-0.02).em)
+    val title = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tTitle, letterSpacing = (-0.01).em)
+    val row = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tRow)
+    val label = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tLabel)
+    val body = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.Medium, fontSize = Tokens.tBody)
+    val small = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.Medium, fontSize = Tokens.tSmall)
+    val mono = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tMono)
+    val badge = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.Bold, fontSize = Tokens.tMono, letterSpacing = 0.14.em)
+    val killLabel = TextStyle(textDirection = TextDirection.Ltr, fontFamily = manrope, fontWeight = FontWeight.ExtraBold, fontSize = Tokens.tLabel, letterSpacing = 0.01.em)
 }
 
-/** Card sizing driven by Settings · Size (design px → dp at 0.5). */
-enum class CardSizeOpt(val dp: androidx.compose.ui.unit.Dp) {
-    SMALL(71.dp), MEDIUM(90.dp), LARGE(115.dp)
+/** Settings · Size → card edge (design px → dp at 0.5). */
+val CardSize.dp: androidx.compose.ui.unit.Dp get() = when (this) {
+    CardSize.SMALL -> 71.dp; CardSize.MEDIUM -> 90.dp; CardSize.LARGE -> 115.dp
 }
 
-/** Card corner style driven by Settings · Shape. */
-enum class CardShapeOpt {
-    SQUARE, ROUNDED, CIRCLE;
-
-    fun shape(sizeDp: androidx.compose.ui.unit.Dp) = when (this) {
-        SQUARE -> RoundedCornerShape(8.dp)
-        ROUNDED -> RoundedCornerShape(16.dp)
-        CIRCLE -> RoundedCornerShape(percent = 50)
-    }
+/** Settings · Shape → corner style (radius 16 / 32 / 50 % at 0.5). */
+fun CardShape.shape(): androidx.compose.ui.graphics.Shape = when (this) {
+    CardShape.SQUARE -> RoundedCornerShape(8.dp)
+    CardShape.ROUNDED -> RoundedCornerShape(16.dp)
+    CardShape.CIRCLE -> RoundedCornerShape(percent = 50)
 }
 
 /** A full accent palette derived from one base colour, so the accent is themeable. */
-data class AccentPalette(val base: Color, val tint: Color, val glow: Color, val onDark: Color)
+@androidx.compose.runtime.Immutable
+data class AccentPalette(val base: Color, val tint: Color, val border: Color, val glow: Color, val onDark: Color)
 
 fun accentPaletteFor(base: Color) = AccentPalette(
     base = base,
-    tint = base.copy(alpha = 0.16f),
+    tint = base.copy(alpha = 0.14f),
+    border = base.copy(alpha = 0.45f),
     glow = base.copy(alpha = 0.55f),
-    onDark = Color(0xFF07140A),     // dark text/glyph on a solid-accent fill
+    onDark = Tokens.accentOnDark,
 )
 
 val LocalAccent = androidx.compose.runtime.staticCompositionLocalOf { accentPaletteFor(Tokens.accent) }
 
-/** User-selectable accent colours (Settings · Accent). */
-enum class AccentColor(val color: Color) {
-    GREEN(Color(0xFF3DDC84)), BLUE(Color(0xFF40A9FF)), PURPLE(Color(0xFF9B6CFF)),
-    AMBER(Color(0xFFF2A93B)), PINK(Color(0xFFEC4899))
+/** Settings · Accent. */
+val Accent.color: Color get() = when (this) {
+    Accent.GREEN -> Color(0xFF3DDC84); Accent.BLUE -> Color(0xFF40A9FF); Accent.PURPLE -> Color(0xFF9B6CFF)
+    Accent.AMBER -> Color(0xFFF2A93B); Accent.PINK -> Color(0xFFEC4899)
 }
 
-/** Overlay backdrop tint (Settings · Background). */
-enum class BgTint(val color: Color) {
-    BLACK(Color(0xFF000000)), CHARCOAL(Color(0xFF0A0B0D)),
-    NAVY(Color(0xFF0A1428)), GREY(Color(0xFF181A1E))
+/** Settings · Background colour (scrim tint). */
+val Tint.color: Color get() = when (this) {
+    Tint.BLACK -> Color(0xFF000000); Tint.CHARCOAL -> Color(0xFF0A0B0D)
+    Tint.NAVY -> Color(0xFF0A1428); Tint.GREY -> Color(0xFF181A1E)
+}
+
+/** Motion spec from the design (README §6). */
+object Motion {
+    val standard = androidx.compose.animation.core.CubicBezierEasing(0.22f, 0.61f, 0.36f, 1f)
+    val flyOut = androidx.compose.animation.core.FastOutLinearInEasing
+    const val SCRIM_MS = 320
+    const val SCROLL_MS = 340
+    const val FOCUS_MS = 260
+    const val FLY_MS = 330
+    const val KILL_STAGGER_MS = 28
+    const val KILL_TO_EMPTY_MS = 520
+    const val EXIT_MS = 170
+    const val LAUNCH_MS = 190
+    const val FOCUS_SCALE = 1.15f
+    const val KILL_FOCUS_SCALE = 1.10f
+    const val IDLE_SCALE = 0.90f
+    const val IDLE_ALPHA = 0.80f
 }
 
 @Composable

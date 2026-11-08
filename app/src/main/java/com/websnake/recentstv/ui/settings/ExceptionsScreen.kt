@@ -1,150 +1,117 @@
 package com.websnake.recentstv.ui.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
 import androidx.tv.material3.Text
 import com.websnake.recentstv.data.InstalledApp
 import com.websnake.recentstv.ui.theme.LocalAccent
+import com.websnake.recentstv.ui.theme.Motion
 import com.websnake.recentstv.ui.theme.Tokens
 import com.websnake.recentstv.ui.theme.Type
 
-/** Surface 2b — scrollable installed-app list with per-app exclude toggles. */
+/** Surface 2b — installed apps with per-app "hide from recents" toggles (RTL, design). */
 @Composable
-fun ExceptionsScreen(
-    apps: List<InstalledApp>,
-    excluded: Set<String>,
-    focus: Int,
-) {
+fun ExceptionsScreen(apps: List<InstalledApp>, excluded: Set<String>, focus: Int, loading: Boolean) {
     val listState = rememberLazyListState()
-    LaunchedEffect(focus) {
-        if (focus in apps.indices) listState.animateScrollToItem(focus)
-    }
+    KeepInView(listState, focus)
 
-    Box(Modifier.fillMaxSize().background(Tokens.bg)) {
-        Column(Modifier.fillMaxSize().padding(start = 60.dp, end = 60.dp, top = 48.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("‹", style = Type.hero, color = Tokens.textDim)
-                Spacer(Modifier.width(14.dp))
-                Text("Exceptions", style = Type.hero, color = Tokens.text)
-            }
-            Text(
-                "Hidden apps are filtered out of the overlay.",
-                style = Type.body, color = Tokens.textDim,
-                modifier = Modifier.padding(top = 4.dp, bottom = 22.dp),
-            )
-            LazyColumn(
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                itemsIndexed(apps, key = { _, a -> a.packageName }) { i, app ->
-                    ExcRow(app = app, excluded = app.packageName in excluded, focused = i == focus)
-                }
+    Column(Modifier.fillMaxSize().background(Tokens.bg).padding(start = 60.dp, end = 60.dp, top = 40.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("→", style = Type.title, color = Tokens.textDim)       // back affordance (RTL: rightmost)
+            Text("Exceptions", style = Type.hero, color = Tokens.text)
+        }
+        Text(
+            "Apps switched on here are hidden from the overlay.",
+            style = Type.body, color = Tokens.textDim, textAlign = TextAlign.Right,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 22.dp),
+        )
+        if (loading && apps.isEmpty()) {
+            Text("Loading apps…", style = Type.body, color = Tokens.textFaint)
+            return@Column
+        }
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 45.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {           // bottom fade affordance
+                    drawContent()
+                    drawRect(Brush.verticalGradient(0.85f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                },
+        ) {
+            itemsIndexed(apps, key = { _, a -> a.packageName }) { i, app ->
+                ExcRow(app, app.packageName in excluded, i == focus)
             }
         }
-        // bottom fade affordance
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .size(width = 0.dp, height = 45.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                        listOf(Color.Transparent, Tokens.bg)
-                    )
-                )
-        )
     }
 }
 
 @Composable
 private fun ExcRow(app: InstalledApp, excluded: Boolean, focused: Boolean) {
     val accent = LocalAccent.current
+    val f by animateFloatAsState(if (focused) 1f else 0f, tween(150, easing = Motion.standard), label = "exc")
+    val stateColor by animateColorAsState(if (excluded) accent.base else Tokens.textDim, tween(150), label = "excs")
     Row(
         Modifier
             .fillMaxWidth()
+            .focusHalo(f, 10.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) Tokens.surface2 else Tokens.surface)
-            .border(1.dp, if (focused) accent.base else Color.Transparent, RoundedCornerShape(10.dp))
+            .drawBehind {
+                drawRect(androidx.compose.ui.graphics.lerp(Tokens.surface, Tokens.surface2, f))
+                if (f > 0.01f) drawRoundRect(accent.base.copy(alpha = f), cornerRadius = CornerRadius(10.dp.toPx()), style = Stroke(2.dp.toPx()))
+            }
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(17.dp),
     ) {
-        val painter = remember(app.packageName) {
-            app.icon?.let {
-                val w = it.intrinsicWidth.takeIf { v -> v > 0 } ?: 96
-                val h = it.intrinsicHeight.takeIf { v -> v > 0 } ?: 96
-                BitmapPainter(it.toBitmap(w, h).asImageBitmap())
-            }
+        Box(Modifier.size(42.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.card), contentAlignment = Alignment.Center) {
+            val icon = app.icon
+            if (icon != null) Image(icon, app.label, Modifier.size(32.dp), contentScale = ContentScale.Fit)
+            else Text(app.label.take(1).uppercase(), style = Type.row, color = Tokens.text)
         }
-        Box(
-            Modifier.size(42.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.card),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (painter != null) {
-                Image(painter, app.label, Modifier.size(30.dp), contentScale = ContentScale.Fit)
-            } else {
-                Text(app.label.take(1).uppercase(), style = Type.row, color = Tokens.text)
-            }
-        }
-        Spacer(Modifier.width(17.dp))
-        Column(Modifier.weight(1f)) {
-            Text(app.label, style = Type.row, color = Tokens.text)
-            Text(app.tag, style = Type.small, color = Tokens.textDim)
-        }
+        Text(app.label, style = Type.row, color = Tokens.text, maxLines = 1, textAlign = TextAlign.Right, modifier = Modifier.weight(1f))
+        Text(app.tag, style = Type.small, color = Tokens.textDim, maxLines = 1)
         Text(
             if (excluded) "Hidden from recents" else "Shown",
-            style = Type.small,
-            color = if (excluded) accent.base else Tokens.textDim,
-            modifier = Modifier.padding(end = 14.dp),
+            style = Type.small, color = stateColor, maxLines = 1, textAlign = TextAlign.Left,
+            modifier = Modifier.widthIn(min = 120.dp),
         )
         Toggle(on = excluded)
-    }
-}
-
-@Composable
-private fun Toggle(on: Boolean) {
-    val accent = LocalAccent.current
-    Box(
-        Modifier
-            .size(width = 54.dp, height = 28.dp)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(if (on) accent.base else Color(0xFF2B2F36))
-            .border(1.dp, if (on) accent.base else Tokens.line, RoundedCornerShape(percent = 50)),
-        contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
-    ) {
-        Box(
-            Modifier
-                .padding(horizontal = 3.dp)
-                .size(21.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(if (on) Color.White else Color(0xFF6B7280))
-        )
     }
 }

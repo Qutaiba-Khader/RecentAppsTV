@@ -1,0 +1,546 @@
+/* ════════════════════════════════════════════════════════════════════
+   Recent Apps TV — dark premium 10-foot UI
+   Designed at 1920×1080. One accent: Android green.
+   ════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* base */
+  --bg:        #0a0b0d;
+  --running:   #101317;
+  --scrim:     rgba(0,0,0,0.66);
+  --surface:   #15171b;
+  --surface-2: #1d2026;
+  --card:      #23262d;
+  --line:      rgba(255,255,255,0.08);
+  --line-2:    rgba(255,255,255,0.04);
+
+  /* text */
+  --text:      #f3f5f7;
+  --text-dim:  #9aa0a8;
+  --text-faint:#5e646c;
+
+  /* accent — Android green */
+  --accent:        #3DDC84;
+  --accent-strong: #2fc973;
+  --accent-tint:   rgba(61,220,132,0.14);
+  --accent-tint-2: rgba(61,220,132,0.22);
+  --accent-glow:   rgba(61,220,132,0.55);
+
+  /* type scale (TV / 1920×1080) */
+  --t-hero:  62px;
+  --t-title: 46px;
+  --t-row:   40px;
+  --t-label: 34px;
+  --t-body:  30px;
+  --t-small: 26px;
+  --t-mono:  22px;
+
+  /* card sizing (driven by Settings · Size) */
+  --card-size: 180px;
+  --card-radius: 32px;  /* Settings · Shape */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Manrope", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* ── stage / scaling ────────────────────────────────────────────────── */
+#stage {
+  position: fixed; inset: 0;
+  background: #000;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+}
+#tvwrap {
+  position: relative;
+}
+#tvwrap > #tv { position: absolute; top: 0; left: 0; transform-origin: top left; }
+#tv {
+  position: relative;
+  width: 1920px; height: 1080px;
+  overflow: hidden;
+  background: var(--running);
+  border-radius: 4px;
+}
+body.embed #stage { background: transparent; }
+body.embed #chrome { display: none; }
+
+/* ── running-app backdrop (what the overlay sits on top of) ─────────── */
+#runningApp {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 90% at 72% 18%, #1c2733 0%, #0e1116 55%, #090a0d 100%);
+  overflow: hidden;
+}
+#runningApp .ra-art {
+  position: absolute; inset: 0;
+  background-image:
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 22px);
+  opacity: 0.6;
+}
+#runningApp .ra-frame {
+  position: absolute; right: 120px; top: 120px;
+  width: 760px; height: 430px; border-radius: 18px;
+  background: linear-gradient(160deg, #233140, #141a22);
+  border: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: center;
+}
+#runningApp .ra-frame span {
+  font: 500 var(--t-mono)/1 "Manrope", sans-serif;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(255,255,255,0.22);
+}
+#runningApp .ra-bar {
+  position: absolute; left: 120px; bottom: 150px;
+  display: flex; flex-direction: column; gap: 26px;
+}
+#runningApp .ra-bar b {
+  display: block; height: 30px; border-radius: 8px;
+  background: rgba(255,255,255,0.07);
+}
+#runningApp .ra-bar b:nth-child(1) { width: 520px; }
+#runningApp .ra-bar b:nth-child(2) { width: 360px; opacity: .7; }
+#runningApp .ra-bar b:nth-child(3) { width: 430px; opacity: .5; }
+
+/* ── scrim ──────────────────────────────────────────────────────────── */
+#scrim {
+  position: absolute; inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity .32s ease;
+  pointer-events: none;
+}
+#tv.show-overlay #scrim,
+#tv.show-empty   #scrim { opacity: 1; }
+
+/* settings / shizuku take the full frame on solid bg */
+#tv.show-settings,
+#tv.show-shizuku { background: var(--bg); }
+
+/* ── screens ────────────────────────────────────────────────────────── */
+.screen {
+  position: absolute; inset: 0;
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease;
+}
+.screen.active { opacity: 1; pointer-events: auto; }
+
+/* ════════════════════════════════════════════════════════════════════
+   OVERLAY · carousel
+   ════════════════════════════════════════════════════════════════════ */
+#overlay { display: flex; flex-direction: column; }
+
+.ov-head {
+  position: absolute; top: 84px; right: 120px; left: 120px;
+  display: flex; align-items: baseline; justify-content: space-between;
+}
+.ov-head .oh-title {
+  font: 700 var(--t-title)/1 "Manrope", sans-serif;
+  letter-spacing: -0.01em;
+}
+.ov-head .oh-sub {
+  font: 500 var(--t-small)/1 "Manrope", sans-serif;
+  color: var(--text-dim);
+  direction: ltr;
+}
+
+/* the carousel sits vertically centered */
+.carousel {
+  position: absolute; left: 0; right: 0;
+  top: 50%; transform: translateY(-50%);
+  height: 420px;
+}
+.strip {
+  position: absolute; top: 50%; left: 0;
+  display: flex; align-items: center; gap: 40px;
+  padding: 0 60px;
+  transform: translate(0, -50%);
+  transition: transform .34s cubic-bezier(.22,.61,.36,1);
+  will-change: transform;
+}
+
+/* a card = an app icon tile + (focused) name label below */
+.card {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .26s cubic-bezier(.22,.61,.36,1), opacity .26s ease;
+}
+.app-tile {
+  width: var(--card-size); height: var(--card-size);
+  border-radius: var(--card-radius);
+  background: var(--tile);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 18px 40px -16px rgba(0,0,0,.7);
+  transition: border-radius .2s ease, width .2s ease, height .2s ease;
+  position: relative;
+}
+.card .app-tile { opacity: .80; transform: scale(.9); transition: inherit; }
+
+/* focused card — the strongest cue */
+.card.focused { z-index: 5; }
+.card.focused .app-tile {
+  opacity: 1; transform: scale(1.15);
+  box-shadow:
+    0 0 0 5px var(--accent),
+    0 0 46px 6px var(--accent-glow),
+    0 24px 54px -14px rgba(0,0,0,.8);
+}
+.card .name {
+  position: absolute; top: 100%; left: 50%;
+  transform: translate(-50%, 30px);
+  white-space: nowrap;
+  font: 700 var(--t-label)/1 "Manrope", sans-serif;
+  color: var(--text);
+  opacity: 0; transition: opacity .2s ease .04s, transform .2s ease;
+}
+.card.focused .name { opacity: 1; transform: translate(-50%, 40px); }
+.card .cat {
+  display: block; margin-top: 10px;
+  font: 500 var(--t-small)/1 "Manrope", sans-serif;
+  color: var(--text-dim); letter-spacing: .01em;
+}
+
+/* dismiss peek (stage 1) + fly-off */
+.card.peek-up   .app-tile { transform: scale(1.15) translateY(-46px); }
+.card.peek-down .app-tile { transform: scale(1.15) translateY(46px); }
+.card.peek-up::after, .card.peek-down::after {
+  content: ""; position: absolute; left: 50%; transform: translateX(-50%);
+  width: 60px; height: 60px;
+  background:
+    linear-gradient(var(--accent),var(--accent)) center/26px 4px no-repeat,
+    linear-gradient(var(--accent),var(--accent)) center/4px 26px no-repeat;
+  -webkit-mask: radial-gradient(circle, #000 60%, transparent 62%);
+          mask: radial-gradient(circle, #000 60%, transparent 62%);
+  border-radius: 50%; opacity: .0;
+}
+.card.peek-up::after  { top: -96px; }
+.card.peek-down::after{ bottom: -96px; }
+/* up/down hint chevrons */
+.card .hint {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  color: var(--accent); opacity: 0; transition: opacity .18s ease;
+  font-size: 46px; line-height: 1; font-weight: 800;
+}
+.card .hint.up   { top: -84px; }
+.card .hint.down { bottom: -84px; }
+.card.peek-up   .hint.up   { opacity: 1; }
+.card.peek-down .hint.down { opacity: 1; }
+
+.card.flyout-up   { transition: transform .34s ease-in, opacity .34s ease-in; transform: translateY(-700px); opacity: 0; }
+.card.flyout-down { transition: transform .34s ease-in, opacity .34s ease-in; transform: translateY(700px);  opacity: 0; }
+
+/* mid-dismiss (static state for the state-map canvas) */
+.card.midflight { z-index: 6; }
+.card.midflight .app-tile {
+  transform: scale(1.08) translateY(-300px);
+  opacity: .34;
+  box-shadow: 0 0 0 5px var(--accent), 0 0 46px 6px var(--accent-glow);
+}
+.card.midflight::before { /* motion streak */
+  content: ""; position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);
+  width: 6px; height: 220px; border-radius: 99px;
+  background: linear-gradient(transparent, var(--accent-glow));
+  opacity: .5;
+}
+.card.midflight .name { opacity: 0; }
+
+/* ── Kill All tile (bigger, accent-tinted, far right) ───────────────── */
+.killall {
+  position: relative; flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px;
+  width: calc(var(--card-size) * 1.34);
+  height: calc(var(--card-size) * 1.18);
+  border-radius: var(--card-radius);
+  background: var(--accent-tint);
+  border: 2px solid rgba(61,220,132,0.45);
+  transition: transform .26s cubic-bezier(.22,.61,.36,1), box-shadow .2s ease, background .2s ease;
+  margin-left: 22px;
+}
+.killall .ka-icon {
+  width: 76px; height: 76px; position: relative;
+}
+/* trash / clear-all glyph built from simple shapes */
+.killall .ka-icon::before { /* lid */
+  content: ""; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+  width: 56px; height: 8px; border-radius: 4px; background: var(--accent);
+}
+.killall .ka-icon::after {  /* bin body */
+  content: ""; position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+  width: 44px; height: 50px; border-radius: 0 0 10px 10px;
+  border: 7px solid var(--accent); border-top: none;
+}
+.killall .ka-handle {
+  position: absolute; top: -2px; left: 50%; transform: translateX(-50%);
+  width: 22px; height: 12px; border: 6px solid var(--accent);
+  border-bottom: none; border-radius: 8px 8px 0 0;
+}
+.killall .ka-label {
+  font: 800 var(--t-label)/1 "Manrope", sans-serif;
+  color: var(--accent); letter-spacing: .01em;
+}
+.killall.focused {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.1);
+  box-shadow: 0 0 0 5px var(--accent), 0 0 50px 8px var(--accent-glow), 0 24px 54px -14px rgba(0,0,0,.8);
+}
+.killall.focused .ka-icon::before,
+.killall.focused .ka-icon::after,
+.killall.focused .ka-handle { background-color: #0a2417; border-color: #0a2417; }
+.killall.focused .ka-label { color: #08210f; }
+
+/* ── empty state ────────────────────────────────────────────────────── */
+#emptyMsg {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  gap: 28px;
+}
+#tv.show-empty #emptyMsg { display: flex; }
+#emptyMsg .em-ic {
+  width: 120px; height: 120px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.14);
+  display: flex; align-items: center; justify-content: center;
+}
+#emptyMsg .em-ic::before {
+  content: ""; width: 46px; height: 46px; border-radius: 12px;
+  border: 3px dashed rgba(255,255,255,0.22);
+}
+#emptyMsg .em-t { font: 700 var(--t-title)/1 "Manrope"; color: var(--text); }
+#emptyMsg .em-s { font: 500 var(--t-body)/1.4 "Manrope"; color: var(--text-dim); text-align: center; direction: ltr; }
+
+/* ════════════════════════════════════════════════════════════════════
+   SETTINGS
+   ════════════════════════════════════════════════════════════════════ */
+#settings { padding: 96px 120px; display: flex; flex-direction: column; }
+.set-title { font: 800 var(--t-hero)/1 "Manrope"; letter-spacing: -0.02em; margin-bottom: 8px; }
+.set-sub { font: 500 var(--t-body)/1 "Manrope"; color: var(--text-dim); margin-bottom: 56px; }
+
+.set-list { display: flex; flex-direction: column; gap: 22px; max-width: 1680px; }
+.row {
+  position: relative;
+  display: flex; align-items: center; justify-content: space-between; gap: 40px;
+  padding: 34px 44px;
+  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: 22px;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
+}
+.row.focused {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-tint), 0 0 40px -6px var(--accent-glow);
+}
+.row .r-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; direction: ltr; text-align: right; }
+.row .r-title { font: 700 var(--t-row)/1.1 "Manrope"; }
+.row .r-desc  { font: 500 var(--t-small)/1.3 "Manrope"; color: var(--text-dim); }
+.row .r-ctrl  { flex: 0 0 auto; display: flex; align-items: center; gap: 22px; }
+
+/* toggle */
+.toggle {
+  width: 108px; height: 56px; border-radius: 999px;
+  background: #2b2f36; border: 2px solid var(--line);
+  position: relative; transition: background .18s ease, border-color .18s ease;
+}
+.toggle::after {
+  content: ""; position: absolute; top: 5px; right: 5px;  /* RTL: knob starts right */
+  width: 42px; height: 42px; border-radius: 50%;
+  background: #6b7280; transition: transform .2s ease, background .18s ease;
+}
+.toggle.on { background: var(--accent); border-color: var(--accent); }
+.toggle.on::after { background: #fff; transform: translateX(-52px); }
+
+/* stepped segmented control */
+.seg { display: flex; gap: 10px; background: #16181c; padding: 8px; border-radius: 16px; border: 2px solid var(--line); }
+.seg .opt {
+  padding: 14px 30px; border-radius: 11px;
+  font: 700 var(--t-small)/1 "Manrope"; color: var(--text-dim);
+  transition: background .15s ease, color .15s ease;
+}
+.seg .opt.sel { background: var(--accent); color: #08210f; }
+
+/* shape preview swatch */
+.shape-prev {
+  width: 76px; height: 76px; background: linear-gradient(160deg,#3a3f48,#23262d);
+  border: 2px solid var(--line);
+}
+.shape-prev[data-shape="square"]  { border-radius: 10px; }
+.shape-prev[data-shape="rounded"] { border-radius: 22px; }
+.shape-prev[data-shape="circle"]  { border-radius: 50%; }
+
+/* exceptions launcher chevron */
+.row .r-go { color: var(--text-dim); font-size: 44px; font-weight: 700; direction: ltr; }
+
+/* ── exceptions sub-screen ──────────────────────────────────────────── */
+#exceptions { padding: 96px 120px; display: flex; flex-direction: column; }
+.exc-head { display: flex; align-items: center; gap: 28px; margin-bottom: 16px; }
+.exc-back { font-size: 44px; color: var(--text-dim); font-weight: 700; }
+.exc-title { font: 800 var(--t-hero)/1 "Manrope"; letter-spacing: -0.02em; }
+.exc-sub { font: 500 var(--t-body)/1 "Manrope"; color: var(--text-dim); margin-bottom: 44px; direction: ltr; text-align: right; }
+.exc-scroll { position: relative; flex: 1; overflow: hidden; }
+.exc-list {
+  display: flex; flex-direction: column; gap: 16px;
+  transition: transform .28s cubic-bezier(.22,.61,.36,1);
+}
+.exc-row {
+  display: flex; align-items: center; gap: 34px;
+  padding: 24px 40px; border-radius: 20px;
+  background: var(--surface); border: 2px solid transparent;
+  transition: background .15s ease, border-color .15s ease;
+}
+.exc-row.focused { background: var(--surface-2); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-tint); }
+.exc-row .er-tile {
+  width: 84px; height: 84px; border-radius: 22px; flex: 0 0 auto;
+  background: var(--tile); display: flex; align-items: center; justify-content: center;
+}
+.exc-row .er-name { font: 700 var(--t-row)/1.1 "Manrope"; flex: 1; direction: ltr; }
+.exc-row .er-cat  { font: 500 var(--t-small)/1 "Manrope"; color: var(--text-dim); direction: ltr; }
+.exc-row .er-state {
+  font: 600 var(--t-small)/1 "Manrope"; color: var(--text-dim); margin-left: 6px; min-width: 220px; text-align: left;
+}
+.exc-row.excluded .er-state { color: var(--accent); }
+.exc-scroll::after {  /* bottom fade */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 90px;
+  background: linear-gradient(transparent, var(--bg)); pointer-events: none;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SHIZUKU permission state
+   ════════════════════════════════════════════════════════════════════ */
+#shizuku {
+  display: flex; align-items: center; justify-content: center;
+}
+.shz-card {
+  width: 1180px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 34px;
+}
+.shz-ic {
+  width: 150px; height: 150px; border-radius: 36px;
+  background: var(--surface); border: 2px solid var(--line);
+  display: flex; align-items: center; justify-content: center; position: relative;
+}
+.shz-ic::before { /* shield-ish: rounded square + check via two bars */
+  content: ""; width: 70px; height: 70px; border-radius: 18px;
+  border: 5px solid var(--text-faint);
+}
+.shz-ic::after {
+  content: ""; position: absolute; width: 16px; height: 34px;
+  border: solid var(--accent); border-width: 0 7px 7px 0;
+  transform: rotate(45deg) translate(2px,-3px);
+}
+.shz-badge {
+  font: 700 var(--t-mono)/1 "Manrope"; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-tint); padding: 12px 22px; border-radius: 999px;
+}
+.shz-title { font: 800 var(--t-hero)/1.05 "Manrope"; letter-spacing: -0.02em; }
+.shz-body { font: 500 var(--t-body)/1.5 "Manrope"; color: var(--text-dim); max-width: 920px; direction: ltr; }
+.shz-actions { display: flex; gap: 28px; margin-top: 14px; }
+.btn {
+  padding: 26px 52px; border-radius: 18px;
+  font: 700 var(--t-row)/1 "Manrope";
+  background: var(--surface-2); color: var(--text); border: 2px solid var(--line);
+  transition: all .16s ease;
+}
+.btn.primary { background: var(--surface-2); }
+.btn.focused {
+  background: var(--accent); color: #08210f; border-color: var(--accent);
+  box-shadow: 0 0 0 5px var(--accent-tint), 0 0 50px -4px var(--accent-glow);
+  transform: scale(1.04);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   app-launch flash (OK on a card → switch to that app)
+   ════════════════════════════════════════════════════════════════════ */
+#launch {
+  position: absolute; inset: 0; display: none;
+  align-items: center; justify-content: center; flex-direction: column; gap: 30px;
+  background: var(--launch-color, #111);
+  opacity: 0; transition: opacity .28s ease;
+}
+#launch.show { display: flex; opacity: 1; }
+#launch .lc-tile {
+  width: 220px; height: 220px; border-radius: 44px;
+  background: rgba(255,255,255,0.16);
+  display: flex; align-items: center; justify-content: center;
+}
+#launch .lc-name { font: 800 56px/1 "Manrope"; color: #fff; }
+#launch .lc-sub  { font: 600 var(--t-body)/1 "Manrope"; color: rgba(255,255,255,0.7); }
+
+/* closed-overlay hint (BACK) */
+#closedHint {
+  position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%);
+  display: none; align-items: center; gap: 18px;
+  padding: 20px 34px; border-radius: 999px;
+  background: rgba(0,0,0,0.6); border: 1px solid var(--line);
+  font: 600 var(--t-small)/1 "Manrope"; color: var(--text-dim);
+  opacity: 0; transition: opacity .3s ease;
+}
+#closedHint.show { display: flex; opacity: 1; }
+#closedHint .key {
+  padding: 6px 14px; border-radius: 8px; background: var(--surface-2);
+  border: 1px solid var(--line); color: var(--text); font-weight: 700;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   glyphs
+   ════════════════════════════════════════════════════════════════════ */
+.gl-letter { font: 800 calc(var(--card-size) * .5)/1 "Manrope"; color: #fff; }
+.gl-play {
+  width: 0; height: 0; margin-left: 8%;
+  border-left: calc(var(--card-size)*.32) solid #fff;
+  border-top: calc(var(--card-size)*.20) solid transparent;
+  border-bottom: calc(var(--card-size)*.20) solid transparent;
+}
+.gl-ring {
+  width: 46%; height: 46%; border-radius: 50%;
+  border: calc(var(--card-size)*.07) solid #fff;
+}
+.gl-diamond {
+  width: 42%; height: 42%; background: #fff; transform: rotate(45deg); border-radius: 8px;
+}
+.gl-grid { display: grid; grid-template: 1fr 1fr / 1fr 1fr; gap: 12%; width: 46%; height: 46%; }
+.gl-grid i { background: #fff; border-radius: 5px; }
+.gl-wave { display: flex; align-items: center; gap: 9%; height: 46%; }
+.gl-wave i { width: calc(var(--card-size)*.055); background: #fff; border-radius: 99px; }
+.gl-wave i:nth-child(1){ height: 50%; } .gl-wave i:nth-child(2){ height: 100%; }
+.gl-wave i:nth-child(3){ height: 70%; }  .gl-wave i:nth-child(4){ height: 40%; }
+
+/* exception/launcher tiles use a fixed smaller glyph scale */
+.er-tile .gl-letter { font-size: 42px; }
+.er-tile .gl-play { border-left-width: 26px; border-top-width: 16px; border-bottom-width: 16px; }
+.er-tile .gl-ring, .er-tile .gl-diamond, .er-tile .gl-grid, .er-tile .gl-wave { width: 40px; height: 40px; }
+
+/* ════════════════════════════════════════════════════════════════════
+   demo chrome (NOT part of product) — scene picker + key legend
+   ════════════════════════════════════════════════════════════════════ */
+#chrome {
+  direction: ltr;
+  margin-top: 22px; max-width: calc(100vw - 32px);
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 16px 30px;
+  font-family: "Manrope", sans-serif;
+}
+.scene-picker { display: flex; gap: 10px; background: #121317; padding: 8px; border-radius: 14px; border: 1px solid var(--line); }
+.scene-picker button {
+  font: 600 16px/1 "Manrope"; color: var(--text-dim);
+  background: transparent; border: 0; padding: 12px 18px; border-radius: 9px; cursor: pointer;
+}
+.scene-picker button.on { background: var(--accent); color: #08210f; }
+.scene-picker button:hover:not(.on) { color: var(--text); background: rgba(255,255,255,0.05); }
+.legend { display: flex; align-items: center; gap: 22px; color: var(--text-faint); font: 500 14px/1 "Manrope"; }
+.legend .lg { display: flex; align-items: center; gap: 8px; }
+.legend .k {
+  min-width: 26px; height: 26px; padding: 0 8px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #1b1d22; border: 1px solid var(--line); color: var(--text-dim); font-weight: 700; font-size: 13px;
+}
+
+#tv.show-settings #runningApp,#tv.show-shizuku #runningApp{display:none}
+.ov-head .oh-title,.ov-head .oh-sub,.killall .ka-label,.shz-title,.shz-badge,.er-cat,.er-name,.er-state,.r-title,.set-title,.exc-title,.btn,.seg .opt,.em-t{white-space:nowrap}

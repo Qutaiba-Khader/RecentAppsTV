@@ -1,97 +1,134 @@
 # Recent Apps TV
 
-A lightweight **Recent Apps / overview switcher for Android TV & Google TV** — for the
-many TV devices that have **no system "recent apps" UI**. It appears as a translucent
-**dialog over whatever app is running**, lets you switch tasks, dismiss a single task
-(D-pad swipe-to-dismiss), or kill everything — using the **remote / D-pad only**.
+A fast, lightweight **Recent Apps switcher for Android TV and Google TV** — for the many TV
+devices that ship with **no system "recent apps" screen**. It opens as a translucent layer
+**over whatever is playing**, and lets you switch apps, remove one, or clear them all —
+with the **remote's arrow keys only**.
 
-Because Android TV restricts the APIs needed to read the task list and remove tasks, the
-app uses **[Shizuku](https://shizuku.rikka.app/)** to obtain the elevated permissions at
-runtime (no root required).
+The task list is read through **[Shizuku](https://shizuku.rikka.app/)** (no root needed).
 
-> Built natively in **Kotlin + Jetpack Compose for TV** from a Claude Design handoff.
+![Recent apps overlay](docs/screenshots/overlay.jpg)
 
----
+<table>
+<tr>
+<td><img src="docs/screenshots/kill-all.jpg" alt="Kill all focused"><br><sub><b>Kill all</b> — clears every recent app</sub></td>
+<td><img src="docs/screenshots/dismiss-peek.jpg" alt="Remove one app"><br><sub><b>Down</b> — the card steps down: press again to remove</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/settings.jpg" alt="Settings"><br><sub><b>Settings</b> — size, shape, colours, dim, exceptions</sub></td>
+<td><img src="docs/screenshots/exceptions.jpg" alt="Exceptions"><br><sub><b>Exceptions</b> — hide apps from the list</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/empty.jpg" alt="No recent apps"><br><sub><b>Empty</b> — nothing to show</sub></td>
+<td><img src="docs/screenshots/shizuku-gate.jpg" alt="Shizuku needed"><br><sub><b>Shizuku</b> — shown until the service runs and access is granted</sub></td>
+</tr>
+</table>
 
-## Features
+<sub>Screens from the design. On the TV your real app icons appear and the playing app shows through behind.</sub>
 
-- **RTL icon carousel** over the running app — Kill-All tile pinned far-right, most-recent
-  app next to it, older apps flowing left; the strip clamps so Kill-All is always visible.
-  The focused app's name is shown as a single label centered along the bottom.
-- **D-pad only**:
-  - **← / →** move focus · **OK** switch to that app · **OK on Kill-All** clears everything · **Back** closes.
-  - **Down** arms the kill flow: the card peeks with a *"Press again to remove"* hint; **Down again** flies it off and removes it. **Up** while peeking cancels.
-  - **Up** (when not peeking) jumps focus to the **settings gear** (top-right).
-- **Long-press OK** on a card → context menu: **Add to exceptions**, **Kill app**, **App info**.
-- **Real removal** — removes *every* task for an app (apps can own several) and, optionally,
-  **force-stops** it so it can't relaunch. Disabled/uninstalled apps are filtered out.
-- **Settings** (D-pad): Show Kill-All, Force-stop on kill, Card size (S/M/L), Card shape
-  (Square/Rounded/Circle), **Accent colour** (5 presets), **Background dim** (0–100 % bar),
-  **Background colour**, and an **Exceptions** list (per-app hide toggles). Persisted in DataStore.
-- **Shizuku gate** when the service isn't running / not granted, and an **Empty** state
-  (Settings still reachable).
-- **Themeable** — one accent colour drives every focus ring and the Kill-All tile.
+## Remote controls
 
-## Launching it
+| Key | In the list |
+|---|---|
+| **← / →** | move between apps (→ goes toward newer apps and **Kill all**) |
+| **OK** | switch to that app · on **Kill all**: clear everything |
+| **Hold OK** | menu: *Add to exceptions* · *Kill app* · *App info* |
+| **↓** then **↓** | remove that app (first press lifts the card down with a hint, second press sends it off) |
+| **↑** | cancel a pending remove · otherwise jump to the ⚙ settings button |
+| **Back** | close (the app underneath carries on) |
+| **Menu** | settings |
 
-There is **no in-app "how to open" trigger** by design. The overlay is launched externally:
+In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The screen reads right-to-left as in the design.
 
-- It registers as a **leanback launcher** entry, and
-- publishes a **static + dynamic launcher shortcut**.
+## What's new in 1.1
 
-Bind a remote button to it (via a button-remapper / shortcut app) using the component:
+- **The new design, fully applied** — the right-to-left layout, the green focus ring with its glow, the name under the
+  focused app, the tinted Kill-all tile, and the Settings / Exceptions / Shizuku screens.
+- **Smooth animations everywhere**: the screen fades in and the row rises into place, focus glides, cards close the gap
+  when one is removed, the removed card falls away with a light trail, Kill all sends the cards up one after another,
+  and Back fades out instead of cutting.
+- **Opens faster.** After the first time it no longer starts from scratch (it steps aside instead of closing), so the
+  backdrop starts fading in at once and the apps are ready **0.05–0.09 s** later. Measured from the launch request,
+  reopening shows the apps in **0.28–0.36 s** instead of 0.38–0.45 s. A cold start (after Android has cleared the app
+  from memory) stays about the same, ~0.8 s.
+- **Smoother**: on the same D-pad test, slow frames dropped from 53–60 % to about 37 %, the median frame from 17–18 ms to
+  14 ms, and the GPU time per frame from 14 ms to 11 ms.
+- **Costs nothing while closed** — no service, no timers, no background work: 10 ms of CPU in 2 minutes,
+  zero wake-ups, zero frames drawn, and less memory held (40 MB instead of 64 MB).
+- **Fixes**: text was drawn in the thinnest weight of the font (now the design's weights); OK sometimes did nothing
+  right after using the hold-OK menu; pressing OK while a removed card was still leaving switched to that app;
+  volume keys now work while the list is open; the app is 1.2 MB instead of 6.1 MB.
+
+Measured on a Samsung Galaxy A50 (Android 11), same test for both versions — see [docs/TESTING.md](docs/TESTING.md).
+
+## Install
+
+1. Install **Shizuku** on the TV and start it (wireless debugging or adb). See the Shizuku guide.
+2. Install **Recent Apps TV** (download the APK from [Releases](../../releases)).
+3. Open it once and choose **Open Shizuku & grant** → *Allow*.
+4. Map a remote button to it (with a button-remapper app), using:
 
 ```
-com.websnake.recentstv/.RecentsActivity        (action: com.websnake.recentstv.OPEN_RECENTS)
+com.websnake.recentstv/.RecentsActivity        (or the action com.websnake.recentstv.OPEN_RECENTS)
 ```
 
-Settings: `com.websnake.recentstv/.SettingsActivity` (also via the in-overlay gear, or MENU).
+It also appears as a normal app in the launcher, and publishes a launcher shortcut. There is deliberately no
+"how to open" option inside the app. Settings: the ⚙ button, the **Menu** key, or `com.websnake.recentstv/.SettingsActivity`.
+
+Upgrading from 1.0 keeps your settings. Reinstalling may ask for the Shizuku permission again.
 
 ## Requirements
 
-- Android TV / Google TV, **Android 7+ (minSdk 24)**.
-- **Shizuku** installed and running, with permission granted to this app.
+- Android TV / Google TV, Android 7.0+ (minSdk 24)
+- Shizuku running, with access granted to this app
 
-## How it works (Shizuku)
+## How it works
 
-The privileged work is isolated in `RecentTasksRepository`, run under the Shizuku **shell**
-identity (which holds `REMOVE_TASKS`, `MANAGE_ACTIVITY_TASKS`, `FORCE_STOP_PACKAGES`):
+All privileged work sits in `RecentTasksRepository`, through the Shizuku shell identity
+(`MANAGE_ACTIVITY_TASKS`, `REMOVE_TASKS`, `FORCE_STOP_PACKAGES`):
 
-| Action  | Mechanism |
-|---------|-----------|
-| read    | shell `am stack list` / `dumpsys activity recents` (the privileged `getRecentTasks` binder only returns the caller's own task under the shell identity) |
-| switch  | `IActivityTaskManager.moveTaskToFront` (reflection) → launch-intent fallback |
-| dismiss | `IActivityTaskManager.removeTask(taskId)` for every task of the package (+ optional `forceStopPackage`) |
-| kill all| `removeTask` per task (+ optional force-stop) |
+| Action | How |
+|---|---|
+| read | the root-task list over the binder (`getAllRootTaskInfos`, or `getAllStackInfos` on Android 10–11) — the same data `am stack list` prints, without starting a process; falls back to `am stack list`, then `dumpsys activity recents` |
+| switch | `IActivityTaskManager.moveTaskToFront`, else the app's launch intent |
+| remove | force-stop (optional), then `removeTask` for **every** task of that app |
+| kill all | the same for every app shown |
 
-`HiddenApiBypass` lifts the hidden-API blocklist; `ShizukuBinderWrapper` routes the calls.
-
-## Architecture
+Everything that decides what you see — the key handling, the task filtering, the settings rules, the row geometry —
+is plain Kotlin in `logic/`, with no Android types, so it is tested on the computer (below).
 
 ```
 com.websnake.recentstv
-├─ RecentsActivity        // translucent dialog; scene routing + D-pad handling
-├─ SettingsActivity       // leanback-style settings + exceptions sub-screen
-├─ RecentsApp             // HiddenApiBypass init + dynamic shortcut
-├─ shizuku/ShizukuManager // binder lifecycle + permission flow
-├─ data/                  // RecentTasksRepository, PackageRepository, SettingsStore (DataStore)
-└─ ui/                    // theme tokens + LocalAccent, overlay carousel, context menu, settings, states
+├─ logic/        Overlay (keys → state + effects), TaskList, Settings, SettingsNav, Geometry   ← fully tested
+├─ data/         RecentTasksRepository (Shizuku), PackageRepository (icons + labels, cached), SettingsStore
+├─ ui/           theme, overlay row, context menu, settings, empty and Shizuku screens
+├─ RecentsActivity   the overlay window: runs the effects, never finishes (steps aside → instant reopen)
+└─ SettingsActivity
 ```
 
-**Smoothness notes** (weak TV GPU): animated values are read via `State.value` *inside*
-`graphicsLayer{}` (draw phase, no recomposition); the carousel is a single translated layer
-(`wrapContentWidth(unbounded=true)` so it sizes to content); focus glow is a `drawBehind`
-radial gradient (no `RenderEffect` blur); cards are keyed and `@Immutable`; icons are
-downscaled. Ship a **release** build — non-debuggable Compose is dramatically smoother.
+Why it is fast: positions are computed instead of measured, and every moving value is read only while drawing, so a key
+press moves one layer instead of rebuilding the row. Icons are prepared off the main thread and kept on disk, labels too.
+Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every cold open). R8 shrinks and optimises the app.
 
-## Building
+## Tests — the flow map
+
+The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
+fails the build on any line or branch that no test runs. 96 tests, 100 % of lines and branches; the critical conditions
+are mutation-tested (each one is removed in a copy and a test must fail: 19 of 19 caught).
 
 ```bash
-# Android SDK + JDK 17 required
-./gradlew :app:assembleRelease
+./gradlew :app:testDebugUnitTest                 # the tests
+python3 tools/flow/flowmap.py check --twice     # the full gate (runs the tests with coverage)
+```
+
+## Build
+
+```bash
+./gradlew :app:assembleRelease     # JDK 17+, Android SDK 35
 # → app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Credits
 
-Original design medium: HTML/CSS/JS prototype (Claude Design). Shizuku by RikkaApps.
+Design: Claude Design. [Shizuku](https://github.com/RikkaApps/Shizuku) by RikkaApps,
+[HiddenApiBypass](https://github.com/LSPosed/AndroidHiddenApiBypass) by LSPosed. Font: Manrope (OFL).

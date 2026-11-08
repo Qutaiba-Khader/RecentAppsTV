@@ -2,72 +2,94 @@ package com.websnake.recentstv
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.websnake.recentstv.data.RecentTask
 import com.websnake.recentstv.data.RecentTasksRepository
-import com.websnake.recentstv.data.RecentsSettings
 import com.websnake.recentstv.data.SettingsStore
+import com.websnake.recentstv.logic.Btn
+import com.websnake.recentstv.logic.Effect
+import com.websnake.recentstv.logic.KeyIn
+import com.websnake.recentstv.logic.OvState
+import com.websnake.recentstv.logic.Overlay
+import com.websnake.recentstv.logic.Scene
+import com.websnake.recentstv.logic.Settings
+import com.websnake.recentstv.logic.SettingsNav
+import com.websnake.recentstv.logic.TaskRef
 import com.websnake.recentstv.shizuku.ShizukuManager
-import com.websnake.recentstv.ui.overlay.OverlayItem
+import com.websnake.recentstv.ui.overlay.ContextMenu
 import com.websnake.recentstv.ui.overlay.RecentsOverlay
 import com.websnake.recentstv.ui.state.EmptyState
 import com.websnake.recentstv.ui.state.ShizukuGate
+import com.websnake.recentstv.ui.theme.Motion
 import com.websnake.recentstv.ui.theme.RecentsTheme
+import com.websnake.recentstv.ui.theme.color
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 
-private enum class Scene { LOADING, OVERLAY, EMPTY, SHIZUKU }
-
+/**
+ * The overlay: a translucent window over the running app.
+ *
+ * Speed: the activity is never finished on close — it moves its own task to the back,
+ * so the next open is a hot start (no process, activity or composition to build).
+ * While hidden it holds no state and runs nothing: no service, no timer, no listener
+ * that wakes the process.
+ */
 class RecentsActivity : ComponentActivity() {
 
     private lateinit var repo: RecentTasksRepository
     private lateinit var store: SettingsStore
 
-    // ── UI state (observed by the composition, mutated by the key handler) ──
-    // Start transparent (LOADING) so the Shizuku gate never flashes before the
-    // async readiness check resolves; reload() picks the real scene immediately.
-    private var scene by mutableStateOf(Scene.LOADING)
-    private val tasks = mutableStateListOf<RecentTask>()
-    private var settings by mutableStateOf(RecentsSettings())
-    private var focus by mutableIntStateOf(0)
-    private var peekDir by mutableIntStateOf(-1)             // -1 none, 0 up, 1 down
-    private var dismissing by mutableStateOf<Pair<Int, Int>?>(null)
-    private var killing by mutableStateOf(false)
-    private var gearFocused by mutableStateOf(false)        // settings gear (top-right)
-    private var shzFocus by mutableIntStateOf(0)
-    private var ctxTask by mutableStateOf<RecentTask?>(null) // long-press context menu target
-    private var ctxSelected by mutableIntStateOf(0)
-    private var longPressFired = false
-    private var busy = false                                  // guards async transitions
+    private var st by mutableStateOf(OvState())
+    private var info by mutableStateOf<Map<Int, RecentTask>>(emptyMap())
+    private var settings by mutableStateOf(Settings())
+    private var loadId by mutableIntStateOf(0)
+    private var scrimOn by mutableStateOf(false)
+    private var contentOn by mutableStateOf(false)
+    private var launchingId by mutableStateOf<Int?>(null)
 
-    private var reloadJob: kotlinx.coroutines.Job? = null
+    private var reloadJob: Job? = null
+    private var openedAt = 0L
+    @Volatile private var tRaw = 0L
 
     private val permListener = Shizuku.OnRequestPermissionResultListener { _, _ -> reload() }
-    // Shizuku's binder attaches asynchronously after process start; re-resolve the
-    // scene the moment it arrives — but only while still waiting, so it doesn't
-    // double the recents read on a warm open (onResume already reloaded).
+    // Shizuku's binder attaches asynchronously after a cold start: re-resolve the scene
+    // when it arrives, but only while still waiting for it.
     private val binderReceived = Shizuku.OnBinderReceivedListener {
-        if (scene == Scene.LOADING || scene == Scene.SHIZUKU) reload()
+        if (st.scene == Scene.LOADING || st.scene == Scene.SHIZUKU) reload()
     }
-    private val binderDead = Shizuku.OnBinderDeadListener { scene = Scene.SHIZUKU }
+    private val binderDead = Shizuku.OnBinderDeadListener {
+        RecentTasksRepository.dropBinders()
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) st = Overlay.needShizuku(st)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,43 +101,74 @@ class RecentsActivity : ComponentActivity() {
 
         setContent {
             RecentsTheme(accent = settings.accent.color) {
-                val scrimColor = settings.bgTint.color
-                val scrimAlpha = settings.bgDim / 100f
-                when (scene) {
-                    Scene.LOADING -> {}                       // transparent; backdrop shows dimmed
-                    Scene.SHIZUKU -> ShizukuGate(focus = shzFocus)
-                    Scene.EMPTY -> Box(Modifier.fillMaxSize()) { Scrim(scrimColor, scrimAlpha); EmptyState() }
-                    Scene.OVERLAY -> Box(Modifier.fillMaxSize()) {
-                        Scrim(scrimColor, scrimAlpha)
-                        RecentsOverlay(
-                            items = buildItems(),
-                            focus = focus,
-                            gearFocused = gearFocused,
-                            peekDir = peekDir,
-                            dismissing = dismissing,
-                            killing = killing,
-                            size = settings.size,
-                            shape = settings.shape,
-                            taskCount = tasks.size,
-                            onDismissComplete = ::onCardFlewOff,
-                        )
-                        ctxTask?.let { com.websnake.recentstv.ui.overlay.ContextMenu(it, ctxSelected) }
+                val dim = settings.bgDim / 100f
+                val tint = settings.bgTint.color
+                val scrim by animateFloatAsState(
+                    if (scrimOn) 1f else 0f, tween(if (scrimOn) Motion.SCRIM_MS else Motion.EXIT_MS), label = "scrim",
+                )
+                val content by animateFloatAsState(
+                    if (contentOn) 1f else 0f,
+                    tween(if (contentOn) Motion.SCROLL_MS else Motion.EXIT_MS, easing = Motion.standard), label = "content",
+                )
+                val rise = with(LocalDensity.current) { 24.dp.toPx() }
+                Box(Modifier.fillMaxSize().drawBehind { if (scrim > 0f) drawRect(tint, alpha = dim * scrim) }) {
+                    Box(
+                        Modifier.fillMaxSize().graphicsLayer {
+                            alpha = content
+                            translationY = (1f - content) * rise          // the strip eases up into place
+                        },
+                    ) {
+                        when (st.scene) {
+                            Scene.LOADING -> {}
+                            Scene.SHIZUKU -> ShizukuGate(focus = st.shzFocus)
+                            Scene.EMPTY -> EmptyState()
+                            Scene.OVERLAY -> RecentsOverlay(
+                                state = st, info = info, size = settings.size, shape = settings.shape,
+                                loadId = loadId, launchingId = launchingId,
+                                onFlyComplete = ::onFlyComplete,
+                            )
+                        }
+                    }
+                    val ctx = st.ctxTask?.let { info[it.taskId] }
+                    AnimatedVisibility(
+                        visible = ctx != null,
+                        enter = fadeIn(tween(160)) + scaleIn(tween(200, easing = Motion.standard), initialScale = 0.94f),
+                        exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.97f),
+                    ) {
+                        lastCtx = ctx ?: lastCtx
+                        lastCtx?.let { ContextMenu(it, st.ctxSel) }
                     }
                 }
             }
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        reload()
+    private var lastCtx: RecentTask? = null   // keeps the menu drawn while it fades out
+
+    override fun onStart() {
+        super.onStart()
+        openedAt = SystemClock.uptimeMillis()
+        scrimOn = true                       // the scrim fades in at once, while the list loads
+        reload()                             // start reading now, not at onResume
     }
 
-    @Suppress("DEPRECATION")
-    override fun finish() {
-        super.finish()
-        // No close transition → the underlying app is revealed instantly, no blink.
-        overridePendingTransition(0, 0)
+    override fun onResume() {
+        super.onResume()
+        // back from the Shizuku app / permission dialog: re-check
+        if (st.scene == Scene.SHIZUKU) reload()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Hidden: hold nothing, so the next open starts clean (no stale frame) and the
+        // process keeps no bitmaps or animations alive while asleep.
+        reloadJob?.cancel()
+        st = OvState(scene = Scene.LOADING, showKillAll = st.showKillAll)
+        info = emptyMap()
+        launchingId = null
+        lastCtx = null
+        scrimOn = false
+        contentOn = false
     }
 
     override fun onDestroy() {
@@ -125,256 +178,129 @@ class RecentsActivity : ComponentActivity() {
         runCatching { Shizuku.removeBinderDeadListener(binderDead) }
     }
 
-    // ── load / scene routing ───────────────────────────────────────────────
+    // ── loading ────────────────────────────────────────────────────────────
     private fun reload() {
-        lifecycleScope.launch {
-            settings = withContext(Dispatchers.IO) { store.settings.first() }
+        reloadJob?.cancel()
+        reloadJob = lifecycleScope.launch {
+            val t0 = SystemClock.uptimeMillis()
+            val sDef = async(Dispatchers.IO) { store.current() }
             if (!ShizukuManager.state().ready) {
-                scene = Scene.SHIZUKU
-                shzFocus = 0
+                settings = sDef.await()
+                st = Overlay.needShizuku(st)
+                contentOn = true
                 return@launch
             }
-            val loaded = withContext(Dispatchers.IO) { repo.getRecentTasks(settings.exceptions) }
-            tasks.clear(); tasks.addAll(loaded)
-            // Reset ALL transient guards — otherwise a warm-reopened overlay (after a
-            // switch set busy=true and finish()ed without process death) stays dead.
-            killing = false; dismissing = null; peekDir = -1; gearFocused = false
-            ctxTask = null; longPressFired = false; busy = false
-            if (tasks.isEmpty()) {
-                scene = Scene.EMPTY
-            } else {
-                scene = Scene.OVERLAY
-                focus = defaultFocus()
-            }
+            val rawDef = async(Dispatchers.IO) { repo.readRaw().also { tRaw = SystemClock.uptimeMillis() - t0 } }
+            val s = sDef.await()
+            val tSet = SystemClock.uptimeMillis() - t0
+            val (raw, src) = rawDef.await()
+            val tasks = withContext(Dispatchers.IO) { repo.resolve(raw, s.exceptions) }
+            val tRes = SystemClock.uptimeMillis() - t0
+            settings = s
+            info = tasks.associateBy { it.taskId }
+            loadId++
+            launchingId = null
+            st = Overlay.loaded(st, tasks.map { TaskRef(it.taskId, it.packageName) }, s.showKillAll)
+            contentOn = true
+            val now = SystemClock.uptimeMillis()
+            Log.i(TAG, "content ${tasks.size} tasks src=$src load=${now - t0}ms (settings@$tSet raw@$tRaw resolved@$tRes) sinceStart=${now - openedAt}ms")
         }
     }
 
-    private fun buildItems(): List<OverlayItem> {
-        val list = ArrayList<OverlayItem>()
-        if (settings.showKillAll && tasks.isNotEmpty()) list.add(OverlayItem.KillAll)
-        tasks.forEach { list.add(OverlayItem.Card(it)) }
-        return list
-    }
-
-    private fun defaultFocus(): Int =
-        if (settings.showKillAll && tasks.isNotEmpty()) 1 else 0
-
-    private fun itemCount(): Int = buildItems().size
-    private fun isKillAllAt(i: Int): Boolean =
-        settings.showKillAll && tasks.isNotEmpty() && i == 0
-    private fun taskAt(i: Int): RecentTask? {
-        val offset = if (settings.showKillAll && tasks.isNotEmpty()) 1 else 0
-        return tasks.getOrNull(i - offset)
-    }
-
-    // ── key handling ────────────────────────────────────────────────────────
-    private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java))
-
+    // ── keys ───────────────────────────────────────────────────────────────
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val code = event.keyCode
+        val btn = Keys.btn(event.keyCode)
+        if (btn == Btn.OTHER) return super.dispatchKeyEvent(event)     // volume etc. still work
         val down = event.action == KeyEvent.ACTION_DOWN
-        val isCenter = code == KeyEvent.KEYCODE_DPAD_CENTER ||
-            code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_BUTTON_A
-
-        if (down) when (code) {
-            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
-                if (ctxTask != null) { ctxTask = null } else finish(); return true
-            }
-            KeyEvent.KEYCODE_MENU -> { openSettings(); return true }
-        }
-
-        // Context menu, when open, captures everything.
-        if (ctxTask != null) {
-            if (down) handleCtxKey(code)
-            return true
-        }
-
-        // Overlay OK: hold = context menu; tap (on key-up) = activate.
-        if (scene == Scene.OVERLAY && isCenter && !gearFocused && !busy && !killing && dismissing == null) {
-            if (down) {
-                if (event.repeatCount == 1 && !isKillAllAt(focus) && taskAt(focus) != null) {
-                    longPressFired = true
-                    ctxSelected = 0; ctxTask = taskAt(focus)
-                }
-                return true
-            }
-            if (event.action == KeyEvent.ACTION_UP) {
-                if (longPressFired) longPressFired = false else handleOverlayKey(KeyEvent.KEYCODE_DPAD_CENTER)
-                return true
-            }
-        }
-
-        if (!down) return true
-        when (scene) {
-            Scene.LOADING -> {}
-            Scene.SHIZUKU -> handleShizukuKey(code)
-            Scene.EMPTY -> when (code) {              // no apps, but Settings still reachable
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BUTTON_A,
-                KeyEvent.KEYCODE_DPAD_UP -> openSettings()
-            }
-            Scene.OVERLAY -> handleOverlayKey(code)
-        }
+        if (!down && event.action != KeyEvent.ACTION_UP) return true
+        val (n, effects) = Overlay.key(st, KeyIn(btn, down, event.repeatCount))
+        st = n
+        effects.forEach(::run)
         return true
     }
 
-    private fun handleCtxKey(code: Int) {
-        val task = ctxTask ?: return
-        when (code) {
-            KeyEvent.KEYCODE_DPAD_UP -> ctxSelected = (ctxSelected - 1).coerceAtLeast(0)
-            KeyEvent.KEYCODE_DPAD_DOWN -> ctxSelected = (ctxSelected + 1).coerceAtMost(2)
-            KeyEvent.KEYCODE_DPAD_LEFT -> ctxTask = null
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BUTTON_A ->
-                executeCtx(task, ctxSelected)
-        }
+    private fun onFlyComplete(taskId: Int) {
+        val (n, effects) = Overlay.flyComplete(st, taskId)
+        st = n
+        effects.forEach(::run)
     }
 
-    private fun removeFromView(task: RecentTask) {
-        val idx = tasks.indexOfFirst { it.taskId == task.taskId }
-        if (idx >= 0) tasks.removeAt(idx)
-        if (tasks.isEmpty()) scene = Scene.EMPTY else focus = focus.coerceIn(0, itemCount() - 1)
-    }
-
-    private fun executeCtx(task: RecentTask, option: Int) {
-        ctxTask = null
-        when (option) {
-            0 -> {                                    // add to exceptions
-                lifecycleScope.launch { store.toggleException(task.packageName) }
-                removeFromView(task)
+    private fun run(e: Effect) {
+        when (e) {
+            is Effect.Switch -> switchTo(e.task)
+            is Effect.Dismiss -> background { repo.dismiss(e.task.taskId, e.task.pkg, settings.forceStopOnKill) }
+            is Effect.KillApp -> background { repo.dismiss(e.task.taskId, e.task.pkg, settings.forceStopOnKill) }
+            is Effect.KillAll -> killAll(e.tasks)
+            is Effect.AddException -> {
+                val n = SettingsNav.toggleException(settings, e.task.pkg)
+                settings = n
+                lifecycleScope.launch { store.save(n) }
             }
-            1 -> {                                    // kill app
-                removeFromView(task)
-                val fs = settings.forceStopOnKill
-                lifecycleScope.launch { withContext(Dispatchers.IO) { repo.dismiss(task, fs) } }
+            is Effect.AppInfo -> runCatching {
+                startActivity(
+                    Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:${e.task.pkg}"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
             }
-            2 -> {                                    // app info
-                runCatching {
-                    startActivity(
-                        Intent(
-                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            android.net.Uri.parse("package:${task.packageName}"),
-                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                }
-                finish()
-            }
-        }
-    }
-
-    private fun handleOverlayKey(code: Int) {
-        if (busy || killing) return
-        if (gearFocused) {
-            when (code) {
-                KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT ->
-                    gearFocused = false
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BUTTON_A ->
-                    startActivity(Intent(this, SettingsActivity::class.java))
-            }
-            return
-        }
-        when (code) {
-            KeyEvent.KEYCODE_DPAD_RIGHT -> { peekDir = -1; moveFocus(-1) }   // toward Kill-All
-            KeyEvent.KEYCODE_DPAD_LEFT -> { peekDir = -1; moveFocus(+1) }    // toward older
-            KeyEvent.KEYCODE_DPAD_UP ->
-                if (peekDir == 1) peekDir = -1          // cancel a pending peek → card back to normal
-                else gearFocused = true                 // otherwise UP → settings gear
-            KeyEvent.KEYCODE_DPAD_DOWN -> if (!isKillAllAt(focus)) dismissStep(1)  // DOWN → dismiss/kill flow
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BUTTON_A -> activate()
-        }
-    }
-
-    private fun moveFocus(d: Int) {
-        val n = itemCount()
-        focus = (focus + d).coerceIn(0, (n - 1).coerceAtLeast(0))
-    }
-
-    private fun dismissStep(dir: Int) {
-        if (isKillAllAt(focus)) return
-        if (dismissing != null) return
-        if (peekDir == dir) {
-            // stage 2 — fly off & remove
-            val task = taskAt(focus) ?: return
-            peekDir = -1
-            dismissing = task.taskId to dir
-        } else {
-            peekDir = dir                              // stage 1 — peek
-        }
-    }
-
-    private fun onCardFlewOff(taskId: Int) {
-        val idx = tasks.indexOfFirst { it.taskId == taskId }
-        if (idx < 0) { dismissing = null; return }
-        val task = tasks[idx]
-        // Remove from the UI immediately so the row collapses with no leftover gap;
-        // the privileged removeTask runs in the background.
-        tasks.removeAt(idx)
-        dismissing = null
-        peekDir = -1
-        if (tasks.isEmpty()) scene = Scene.EMPTY
-        else focus = focus.coerceIn(0, itemCount() - 1)
-        val fs = settings.forceStopOnKill
-        lifecycleScope.launch { withContext(Dispatchers.IO) { repo.dismiss(task, fs) } }
-    }
-
-    private fun activate() {
-        if (isKillAllAt(focus)) killAll()
-        else taskAt(focus)?.let { switchTo(it) }
-    }
-
-    private fun switchTo(task: RecentTask) {
-        if (busy) return
-        busy = true
-        lifecycleScope.launch {
-            val moved = withContext(Dispatchers.IO) { repo.switchTo(task) }
-            if (!moved) {
-                // fallback: relaunch via the app's own launch intent
-                val li = packageManager.getLeanbackLaunchIntentForPackage(task.packageName)
-                    ?: packageManager.getLaunchIntentForPackage(task.packageName)
-                li?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                runCatching { li?.let { startActivity(it) } }
-            }
-            delay(120)
-            finish()                                   // reveal the now-foregrounded app
-        }
-    }
-
-    private fun killAll() {
-        if (busy) return
-        busy = true
-        killing = true
-        val snapshot = tasks.toList()
-        val fs = settings.forceStopOnKill
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) { repo.killAll(snapshot, fs) }
-            delay(520)                                  // let the staggered fly-up play
-            tasks.clear()
-            killing = false
-            busy = false
-            scene = Scene.EMPTY
-        }
-    }
-
-    private fun handleShizukuKey(code: Int) {
-        when (code) {
-            KeyEvent.KEYCODE_DPAD_LEFT -> shzFocus = (shzFocus + 1).coerceAtMost(1)
-            KeyEvent.KEYCODE_DPAD_RIGHT -> shzFocus = (shzFocus - 1).coerceAtLeast(0)
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
-                // Either button advances the flow so a mis-focus can't strand the user.
-                val st = ShizukuManager.state()
-                if (!st.binderAlive) {
-                    ShizukuManager.openShizuku(this)         // Shizuku service not running
-                } else if (!st.permissionGranted) {
-                    ShizukuManager.requestPermission()       // running but not granted
-                }
+            Effect.OpenSettings -> startActivity(Intent(this, SettingsActivity::class.java))
+            Effect.Close -> close()
+            Effect.GateAction -> {
+                val s = ShizukuManager.state()
+                if (!s.binderAlive) ShizukuManager.openShizuku(this)
+                else if (!s.permissionGranted) ShizukuManager.requestPermission()
                 reload()
             }
         }
     }
-}
 
-/** Solid scrim that mutes whatever app is behind the translucent overlay, so the
- *  carousel reads cleanly even over bright apps (the system dim alone isn't
- *  enough against light content). */
-@androidx.compose.runtime.Composable
-private fun Scrim(color: Color, alpha: Float) {
-    Box(Modifier.fillMaxSize().background(color.copy(alpha = alpha)))
+    private fun background(block: () -> Unit) {
+        lifecycleScope.launch(Dispatchers.IO) { block() }
+    }
+
+    private fun switchTo(task: TaskRef) {
+        val rt = info[task.taskId] ?: return
+        launchingId = task.taskId                   // focused card zooms, the rest fade
+        lifecycleScope.launch {
+            val moved = withContext(Dispatchers.IO) { repo.switchTo(rt) }
+            if (!moved) {
+                val li = packageManager.getLeanbackLaunchIntentForPackage(task.pkg)
+                    ?: packageManager.getLaunchIntentForPackage(task.pkg)
+                li?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { li?.let { startActivity(it) } }
+            }
+            delay(Motion.LAUNCH_MS.toLong())
+            // Normally the app is already in front and we are stopped; if not, step aside.
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) hideNow()
+        }
+    }
+
+    private fun killAll(tasks: List<TaskRef>) {
+        val pkgs = tasks.mapTo(HashSet()) { it.pkg }
+        val fs = settings.forceStopOnKill
+        lifecycleScope.launch {
+            val job = async(Dispatchers.IO) { repo.killAll(pkgs, fs) }
+            delay(Motion.KILL_TO_EMPTY_MS.toLong())        // the staggered fly-up plays meanwhile
+            job.await()
+            st = Overlay.killAllDone(st)
+        }
+    }
+
+    /** BACK: fade scrim + content out, then step aside. */
+    private fun close() {
+        scrimOn = false
+        contentOn = false
+        lifecycleScope.launch {
+            delay(Motion.EXIT_MS.toLong())
+            hideNow()
+        }
+    }
+
+    /** Move this overlay's own task behind everything (kept alive for a hot reopen). */
+    @Suppress("DEPRECATION")
+    private fun hideNow() {
+        if (!moveTaskToBack(true)) finish()
+        overridePendingTransition(0, 0)
+    }
+
+    companion object { private const val TAG = "RTV" }
 }
