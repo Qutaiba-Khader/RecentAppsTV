@@ -58,6 +58,7 @@ data class OvState(
     val selecting: String? = null,            // package chosen with OK: the select zoom is playing
     val shzFocus: Int = 0,                    // gate: 0 = open & grant, 1 = retry
     val closing: Boolean = false,             // exit animation running
+    val current: String? = null,              // 1.10: the app under the overlay (null = the launcher / unknown)
 ) {
     /** Running apps that are not pinned, newest first. */
     val tasks: List<TaskRef> by lazy { all.filter { it.pkg !in pinned } }
@@ -117,8 +118,10 @@ object Overlay {
     }
 
     /** A fresh list arrived: route the scene and clear every transient guard. */
-    fun loaded(s: OvState, all: List<TaskRef>, pinned: List<String>, showKillAll: Boolean, pinRight: Boolean): OvState =
-        settle(OvState(scene = Scene.OVERLAY, all = all, pinned = pinned, showKillAll = showKillAll, pinRight = pinRight), null)
+    fun loaded(
+        s: OvState, all: List<TaskRef>, pinned: List<String>, showKillAll: Boolean, pinRight: Boolean, current: String? = null,
+    ): OvState =
+        settle(OvState(scene = Scene.OVERLAY, all = all, pinned = pinned, showKillAll = showKillAll, pinRight = pinRight, current = current), null)
 
     fun needShizuku(s: OvState) = OvState(scene = Scene.SHIZUKU, showKillAll = s.showKillAll)
 
@@ -239,6 +242,8 @@ object Overlay {
         if (item == Item.Settings) return s to listOf(Effect.OpenSettings)
         if (item == Item.KillAll) return s.copy(busy = true, killing = true, peek = PEEK_NONE) to
             listOf(Effect.KillAll(s.tasks + s.pins.mapNotNull { p -> p.taskId?.let { TaskRef(it, p.pkg) } }))
+        // 1.10: the app already under the overlay — nothing to open: the overlay just goes, no zoom, no switch
+        if (item.key == s.current) return s.copy(closing = true, peek = PEEK_NONE) to listOf(Effect.Close)
         // a task, or a pin (its running task, or a launch when it isn't running)
         return s.copy(busy = true, selecting = item.key, peek = PEEK_NONE) to listOf(Effect.Switch(item.key, item.taskId))
     }

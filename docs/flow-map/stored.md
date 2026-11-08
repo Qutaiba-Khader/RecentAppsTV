@@ -18,6 +18,7 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 | P-STO-09 | Stored.merge | exclusions and cap | excluded dropped, newest first, capped (default 20) | StoredTest.kt asserts the result | Stored.kt — `merge()` filter / take |
 | P-STO-10 | Stored.foldUsage | saved map + new events | newest resume per app, pruned to the window | StoredTest.kt asserts the result | Stored.kt — `foldUsage()` |
 | P-STO-12 | Stored.merge | usage-only apps newer than old tasks, small cap | every app with a task keeps its place; usage-only apps fill the rest | StoredTest.kt asserts the result | Stored.kt — `merge()` places |
+| P-STO-13 | Stored.current | stored list / seen list | the first stored task not this app nor excluded (null when home); from a seen list the newest that isn't this app | StoredTest.kt asserts the result | Stored.kt — `current()` / `currentOf()` |
 | P-STO-11 | Stored.remove / killAll / prune | removals | one tombstone; Kill all = epoch and no tombstones; prune drops stale and covered | StoredTest.kt asserts the result | Stored.kt — ledger helpers |
 
 ## Mode combinations

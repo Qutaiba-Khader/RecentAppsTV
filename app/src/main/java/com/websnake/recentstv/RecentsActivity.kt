@@ -253,7 +253,12 @@ class RecentsActivity : ComponentActivity() {
             val ready = shz.ready
             shizukuRunning = shz.binderAlive
             // Shizuku off (a TV reboot): the last row + usage access, if there is anything to show; else the gate
-            val limitedSoft = if (ready) null else withContext(Dispatchers.IO) { rows.seed() + rows.usage(now) }
+            var limitedCurrent: String? = null
+            val limitedSoft = if (ready) null else withContext(Dispatchers.IO) {
+                val usage = rows.usage(now)
+                limitedCurrent = Stored.currentOf(usage, packageName)      // the last app resumed before the overlay
+                rows.seed() + usage
+            }
             if (!ready && limitedSoft.isNullOrEmpty()) {
                 settings = sDef.await()
                 limited = false
@@ -291,11 +296,12 @@ class RecentsActivity : ComponentActivity() {
             st = Overlay.loaded(
                 st, r.all.map { TaskRef(it.taskId ?: -1, it.packageName) }, r.pins.map { it.packageName },
                 s.showKillAll, s.pinPosition == PinPosition.RIGHT,
+                current = if (ready) repo.current else limitedCurrent,
             )
             contentOn = true
             val nowUp = SystemClock.uptimeMillis()
             Log.i(TAG, "content ${r.all.size} apps (${r.all.count { (it.taskId ?: -1) > 0 }} resumable) ${r.pins.size} pins mode=$mode " +
-                "stored=${tasks.size} usage=${soft.size} load=${nowUp - t0}ms (settings@$tSet store@$tRaw resolved@$tRes) sinceStart=${nowUp - openedAt}ms")
+                "stored=${tasks.size} usage=${soft.size} current=${if (ready) repo.current else limitedCurrent} load=${nowUp - t0}ms (settings@$tSet store@$tRaw resolved@$tRes) sinceStart=${nowUp - openedAt}ms")
         }
     }
 

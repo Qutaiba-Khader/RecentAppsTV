@@ -27,6 +27,11 @@ the D-pad in the system picker, Exceptions bulk bar. Found and fixed: the menu w
 an OK pressed in the hold menu opened the app under it on release (also in 1.1); a release during an animation kept the
 hold flag and ate the next OK.
 
+1.10 (same A50, 2026-11-09, Shizuku in **shell** mode): from Clock → overlay (`current=clockpackage`) → OK on Clock →
+gone within 250 ms, no zoom, 0 switch calls, Clock in front; ← → OK on Play Store → zoom + startActivityFromRecents; from
+the launcher → `current=null` → OK opens normally; Shizuku off, from Gallery → `current=gallery3d` (usage) → OK on the
+Gallery pin → overlay closed, no launch.
+
 1.9 (same A50, 2026-11-09, Shizuku in **shell** mode, `rkey`): ↑ on Calendar → balloon top→bottom Close (✕) · App
 info · Add to exceptions · Pin to row, Pin focused; ↑↑↑ → Close, ↓↓↓ → Pin, ↓ → balloon closed, card normal; ↓ (card
 lowered) then ↑ → card back, Calendar still running with its task; ↑×4 + OK (Close) → Calendar process dead, 0 tasks;

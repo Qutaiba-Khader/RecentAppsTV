@@ -62,6 +62,7 @@ Run: `python3 tools/flow/flowmap.py check` (the JVM lane runs inside CT 200 via 
 | P-OVL-53 | Overlay.relaunched | the app is launched again while the overlay shows (menu open, gate, closing, opening an app) | closes like Back; nothing while closing or opening an app | OverlayTest.kt asserts state + effects | Overlay.kt — `relaunched()` |
 | P-OVL-54 | Overlay.key | menu - Close on a pin | a running pin loses its task and stays pinned; an idle pin: nothing | OverlayTest.kt asserts state + effects | Overlay.kt — `ctxKey()` CLOSE |
 | P-OVL-55 | Overlay.key | menu - DOWN on the bottom row (Pin) | the menu closes, the card is as before, OK opens the app | OverlayTest.kt asserts state + effects | Overlay.kt — `ctxKey()` DOWN |
+| P-OVL-56 | Overlay.key | OK on the app under the overlay (task or pin), on another app, nothing known | closes without zoom or switch; others switch as before | OverlayTest.kt asserts state + effects | Overlay.kt — `activate()` current check |
 
 ## Mode combinations
 

@@ -97,7 +97,12 @@ class RecentTasksRepository(private val context: Context) {
      * Every task the system stores (`dumpsys activity recents`, the store's MRU order), plus the visible recents
      * (getRecentTasks) as a canary for a changed dumpsys format. Null when neither can be read.
      */
+    /** 1.10: the app under the overlay at the last [readStoredRow] (null = the launcher / unknown). */
+    @Volatile var current: String? = null
+        private set
+
     fun readStoredRow(now: Long): Pair<List<Seen>, RowMode>? {
+        current = null
         if (!ready()) return null
         homePackages
         // the two reads run at once: the dumpsys process spawn is the slow part
@@ -105,6 +110,7 @@ class RecentTasksRepository(private val context: Context) {
         Thread(visibleJob, "rtv-visible").start()
         val stored = Stored.parse(execShell("dumpsys activity recents"))
         val visible = visibleJob.get()
+        current = if (stored.isNotEmpty()) Stored.current(stored, context.packageName) else Stored.currentOf(visible, context.packageName)
         if (stored.isNotEmpty()) return Stored.candidates(stored, now, visible) to RowMode.STORED
         if (visible.isNotEmpty()) return visible to RowMode.VISIBLE
         // last resort: the 1.6 chain (root tasks → am stack list), without times (store order kept)

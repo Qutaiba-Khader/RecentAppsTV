@@ -334,5 +334,23 @@
   "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
   "find": "Btn.DOWN -> (if (s.ctxSel <= 0) s.copy(ctxPkg = null, ctxSel = 0) else s.copy(ctxSel = s.ctxSel - 1)) to emptyList()",
   "replace": "Btn.DOWN -> (if (s.ctxSel <= 1) s.copy(ctxPkg = null, ctxSel = 0) else s.copy(ctxSel = s.ctxSel - 1)) to emptyList()"
+ },
+ {
+  "id": "G-CURRENT-match",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Overlay.kt",
+  "find": "if (item.key == s.current) return",
+  "replace": "if (false) return"
+ },
+ {
+  "id": "G-CURRENT-home",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "return if (top.home) null else top.pkg",
+  "replace": "return top.pkg"
+ },
+ {
+  "id": "G-CURRENT-excluded",
+  "file": "app/src/main/java/com/websnake/recentstv/logic/Stored.kt",
+  "find": "val top = stored.firstOrNull { it.pkg != self && !it.excluded } ?: return null",
+  "replace": "val top = stored.firstOrNull { it.pkg != self } ?: return null"
  }
 ]

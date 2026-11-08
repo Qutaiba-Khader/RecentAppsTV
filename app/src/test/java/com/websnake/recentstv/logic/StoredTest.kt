@@ -159,4 +159,14 @@ class StoredTest {
         assertEquals(listOf("u5", "t3", "t2", "t1"), r.map { it.pkg })
         assertEquals(3, Stored.merge(tasks + Seen("t9", 9, 0), emptyList(), Ledger(), { false }, max = 3).size)
     }
+
+    @Test fun `P-STO-13 current - the first stored task that is not this app nor excluded, null when it is home`() {
+        val me = "com.websnake.recentstv"
+        val t = { id: Int, pkg: String, home: Boolean, excl: Boolean -> StoredTask(id, pkg, 0, home, excl, true) }
+        assertEquals("ar.tvplayer.tv", Stored.current(listOf(t(1, me, false, true), t(2, "dlg", false, true), t(3, "ar.tvplayer.tv", false, false), t(4, "x", false, false)), me))
+        assertEquals(null, Stored.current(listOf(t(1, me, false, true), t(2, "launcher", true, false), t(3, "x", false, false)), me))
+        assertEquals(null, Stored.current(listOf(t(1, me, false, false)), me))
+        assertEquals("b", Stored.currentOf(listOf(Seen(me, 1, 99), Seen("a", 2, 10), Seen("b", -1, 20)), me))   // newest that isn't me
+        assertEquals(null, Stored.currentOf(listOf(Seen(me, 1, 99)), me))
+    }
 }

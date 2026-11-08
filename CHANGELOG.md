@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10 — 2026-11-09
+
+- OK on the app under the overlay closes the overlay instead of playing the select zoom and switching (`Overlay.activate`,
+  `OvState.current`). Current app = first stored task that is not this app nor excluded, none when it is the launcher
+  (`Stored.current`); with Shizuku off, the newest usage resume (`Stored.currentOf`).
+
 ## 1.9 — 2026-11-09
 
 - Balloon drawn bottom-up (Close · App info · Add to exceptions · Pin to row); Pin, nearest the card, is focused first;

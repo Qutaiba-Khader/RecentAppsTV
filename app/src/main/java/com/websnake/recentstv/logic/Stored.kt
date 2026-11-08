@@ -78,6 +78,19 @@ object Stored {
     }
 
     /**
+     * 1.10: the app under the overlay — the first stored task (the store is in MRU order) that is not this app ([self])
+     * or a task started excluded from recents (another overlay/dialog). Null when that is the launcher (home).
+     */
+    fun current(stored: List<StoredTask>, self: String): String? {
+        val top = stored.firstOrNull { it.pkg != self && !it.excluded } ?: return null
+        return if (top.home) null else top.pkg
+    }
+
+    /** The same from a list without a home flag (the visible recents, or usage resumes): the newest that isn't [self]. */
+    fun currentOf(seen: List<Seen>, self: String): String? =
+        seen.filter { it.pkg != self }.maxByOrNull { it.lastUsed }?.pkg
+
+    /**
      * Stored tasks → row candidates, newest first, with wall-clock times. The store's order is the truth (it is
      * the system's MRU order, kept across reboots); "inactive for" only gives each task a time to merge usage
      * against, so it is clamped never to run ahead of the task before it (restored tasks may all report the boot).

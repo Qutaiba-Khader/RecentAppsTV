@@ -456,4 +456,16 @@ class OverlayTest {
         val gate = Overlay.relaunched(Overlay.needShizuku(ready(a)))
         assertEquals(listOf(Effect.Close), gate.second)                              // the gate closes too
     }
+
+    // 1.10: OK on the app already under the overlay just closes it — no zoom, no switch
+    @Test fun `P-OVL-56 OK on the current app closes the overlay, another app still switches, a current pin closes too`() {
+        val r = Overlay.loaded(OvState(), listOf(a, b), emptyList(), true, false, current = "app.a")
+        val (n, e) = tap(r, Btn.OK)
+        assertEquals(listOf(Effect.ArmHold, Effect.Close), e); assertTrue(n.closing); assertNull(n.selecting); assertFalse(n.busy)
+        val other = press(r, Btn.LEFT).first
+        assertEquals(Effect.Switch("app.b", 12), tap(other, Btn.OK).second.last())
+        val p = Overlay.loaded(OvState(), listOf(b), listOf("app.a"), true, false, current = "app.a").copy(focus = 2)
+        assertEquals("app.a", p.focusedItem?.key); assertEquals(Effect.Close, tap(p, Btn.OK).second.last())
+        assertEquals(Effect.Switch("app.a", 11), tap(ready(a, b), Btn.OK).second.last())          // nothing known: as before
+    }
 }

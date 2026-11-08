@@ -49,7 +49,7 @@ backup when Shizuku isn't running.
 |---|---|
 | **← / →** | move between apps (→ goes toward newer apps and **Kill all**) — the focused app always sits in the middle of the screen |
 | **↑** on **Kill all** | the **⚙ Settings** button above it (**↓** back to Kill all, **←** on to the apps) |
-| **OK** | open that app · on **Kill all**: clear running apps (pins stay) · on **⚙ Settings**: open Settings |
+| **OK** | open that app (on the app you are already in: just close the list) · on **Kill all**: clear running apps (pins stay) · on **⚙ Settings**: open Settings |
 | **↑** or **Hold OK** (about half a second) | the app's balloon menu, read from the card up: *Pin to row / Unpin* (focused first) · *Add to exceptions* · *App info* · *Close* (✕) — it stays open after you let go; **↑** climbs, **↓** steps back and on *Pin* closes it, **OK** runs, **Back** closes |
 | **↓ ↓** | remove that app (first press lowers the card with a hint — **↑** puts it back — second press sends it off); pinned apps can't be removed this way; *Close* in the menu does the same, also for a running pinned app (it stays pinned) |
 | **Back** | close the menu, or close the list (the app underneath carries on) |
@@ -63,6 +63,12 @@ In Settings: **↑ / ↓** choose a row, **← / → / OK** change it. The scree
 position* and the colour swatches read left-to-right (→ means Right). On *Pinned apps* and *Exceptions*, **↑** from the
 first row reaches the *Unpin all* / *Hide all* / *Show all* buttons. On *Background image*, **↑** from the pictures
 reaches the picker apps (Gallery, Files…).
+
+## What's new in 1.10
+
+- **OK on the app you are already in just closes the list** — no zoom, no colour, no relaunch, you stay where you were.
+  The app under the list is the first task in the system's store (or, with Shizuku off, the last app used); every other
+  app still opens with the animation.
 
 ## What's new in 1.9
 
@@ -252,8 +258,8 @@ Settings live in plain SharedPreferences (DataStore cost 150–200 ms on every c
 ## Tests — the flow map
 
 The project keeps a **flow map** (`docs/FLOW-MAP.md`): every path through `logic/` has a row and one test, and a gate
-fails the build on any line or branch that no test runs. 179 tests, 100 % of lines and branches; the critical conditions
-are mutation-tested (each one is removed in a copy and a test must fail: 56 of 56 caught).
+fails the build on any line or branch that no test runs. 184 tests, 100 % of lines and branches; the critical conditions
+are mutation-tested (each one is removed in a copy and a test must fail: 59 of 59 caught).
 
 Remote input is tested on a real device as well, with `tools/perf/rkey` — a tiny virtual remote (uinput, root) that
 holds keys the way a TV remote does, so Android sends its own key repeats. (`adb shell input keyevent --longpress` sends

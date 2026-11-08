@@ -319,4 +319,23 @@ class GatesTest {
         assertNull(press(m, Btn.DOWN).first.ctxPkg)
         assertEquals("app.a", press(m.copy(ctxSel = 1), Btn.DOWN).first.ctxPkg)
     }
+
+    // ── G-CURRENT (1.10): the app under the overlay is not re-opened ──
+    @Test fun `G-CURRENT-match only the app under the overlay closes instead of switching`() {
+        val r = Overlay.loaded(OvState(), listOf(a), emptyList(), true, false, current = "app.a")
+        assertEquals(Effect.Close, release(press(r, Btn.OK).first, Btn.OK).second.last())
+        val o = Overlay.loaded(OvState(), listOf(a), emptyList(), true, false, current = "app.z")
+        assertEquals(Effect.Switch("app.a", 11), release(press(o, Btn.OK).first, Btn.OK).second.last())
+    }
+
+    @Test fun `G-CURRENT-home a launcher on top means no current app`() {
+        val home = StoredTask(5, "launcher", 0, true, false, true)
+        assertNull(Stored.current(listOf(home, StoredTask(6, "app.a", 0, false, false, true)), "me"))
+        assertEquals("launcher", Stored.current(listOf(home.copy(home = false)), "me"))
+    }
+
+    @Test fun `G-CURRENT-excluded an excluded overlay task on top is skipped`() {
+        val dlg = StoredTask(5, "dlg", 0, false, true, true)
+        assertEquals("app.a", Stored.current(listOf(dlg, StoredTask(6, "app.a", 0, false, false, true)), "me"))
+    }
 }
