@@ -69,6 +69,7 @@ reaches the picker apps (Gallery, Files…).
 - **OK on the app you are already in just closes the list** — no zoom, no colour, no relaunch, you stay where you were.
   The app under the list is the first task in the system's store (or, with Shizuku off, the last app used); every other
   app still opens with the animation.
+- 1.10.1: the balloon's header shows just the app name (no "Running" / "Not running"; "Pinned" for a pinned app).
 
 ## What's new in 1.9
 

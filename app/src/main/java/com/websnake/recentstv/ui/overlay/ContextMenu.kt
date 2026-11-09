@@ -67,7 +67,7 @@ fun ContextMenu(
     var last by remember { mutableStateOf<Triple<RecentTask, Boolean, Boolean>?>(null) }
     if (task != null) last = Triple(task, pinned, running)
     val shown by animateFloatAsState(if (task != null) 1f else 0f, tween(if (task != null) 220 else 140, easing = Motion.standard), label = "menu")
-    val (t, isPinned, isRunning) = last ?: return
+    val (t, isPinned, _) = last ?: return
     if (shown <= 0f && task == null) return
 
     val rows = listOf(
@@ -109,10 +109,8 @@ fun ContextMenu(
             }
             Column {
                 Text(t.label, style = Type.label.copy(fontWeight = FontWeight.ExtraBold), color = Tokens.text, maxLines = 1)
-                Text(
-                    listOfNotNull(if (isPinned) "Pinned" else null, if (isRunning) "Running" else "Not running").joinToString(" · "),
-                    style = Type.small, color = Tokens.textDim, maxLines = 1,
-                )
+                // 1.10.1: no running status under the name (owner); only "Pinned" for a pinned app
+                if (isPinned) Text("Pinned", style = Type.small, color = Tokens.textDim, maxLines = 1)
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(Tokens.line))

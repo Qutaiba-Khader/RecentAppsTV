@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.1 — 2026-11-09
+
+- The balloon's header no longer shows "Running" / "Not running" under the app name; only "Pinned" for a pinned app.
+
 ## 1.10 — 2026-11-09
 
 - OK on the app under the overlay closes the overlay instead of playing the select zoom and switching (`Overlay.activate`,
